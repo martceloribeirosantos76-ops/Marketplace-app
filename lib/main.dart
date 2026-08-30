@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+const supabaseUrl = 'https://iwjnkguatgumdcfpytpu.supabase.co';
+const supabasePublishableKey =
+    'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabasePublishableKey,
+  );
+
   runApp(const MarketplaceApp());
 }
 
@@ -31,37 +43,39 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int currentIndex = 0;
   String search = '';
+  bool loading = true;
 
-  final List<Map<String, dynamic>> products = [
-    {
-      'name': 'Smartphone',
-      'price': 1299.90,
-      'category': 'Eletrônicos',
-    },
-    {
-      'name': 'Tênis Esportivo',
-      'price': 199.90,
-      'category': 'Moda',
-    },
-    {
-      'name': 'Fone Bluetooth',
-      'price': 89.90,
-      'category': 'Eletrônicos',
-    },
-    {
-      'name': 'Cadeira de Escritório',
-      'price': 499.90,
-      'category': 'Casa',
-    },
-  ];
+  List<Map<String, dynamic>> products = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadProducts();
+  }
+
+  Future<void> loadProducts() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('products')
+          .select()
+          .order('created_at', ascending: false);
+
+      setState(() {
+        products = List<Map<String, dynamic>>.from(data);
+        loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredProducts = products.where((product) {
-      return product['name']
-          .toString()
-          .toLowerCase()
-          .contains(search.toLowerCase());
+      final name = product['name']?.toString().toLowerCase() ?? '';
+      return name.contains(search.toLowerCase());
     }).toList();
 
     return Scaffold(
@@ -159,72 +173,95 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 Expanded(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      final product = filteredProducts[index];
+                  child: loading
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : filteredProducts.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Nenhum produto encontrado.',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                            )
+                          : GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 0.75,
+                              ),
+                              itemCount: filteredProducts.length,
+                              itemBuilder: (context, index) {
+                                final product = filteredProducts[index];
 
-                      return Card(
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {},
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(12),
+                                final name =
+                                    product['name']?.toString() ?? 'Produto';
+
+                                final price =
+                                    product['price']?.toString() ?? '0.00';
+
+                                final category =
+                                    product['category_id']?.toString() ?? '';
+
+                                return Card(
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () {},
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade200,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.shopping_bag,
+                                                size: 60,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            name,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Text(
+                                            'R\$ $price',
+                                            style: const TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          if (category.isNotEmpty)
+                                            Text(
+                                              category,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                    child: const Icon(
-                                      Icons.shopping_bag,
-                                      size: 60,
-                                      color: Colors.grey,
-                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  product['name'],
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  'R\$ ${product['price'].toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  product['category'],
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ],
             )
