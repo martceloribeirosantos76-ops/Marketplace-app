@@ -15,7 +15,7 @@
 
     body {
       font-family: Arial, sans-serif;
-      background: #f5f6f8;
+      background: #f4f6f8;
       color: #222;
     }
 
@@ -28,28 +28,60 @@
 
     header h1 {
       font-size: 30px;
-      margin-bottom: 8px;
+      margin-bottom: 7px;
     }
 
     header p {
-      font-size: 15px;
       color: #d1d5db;
+      font-size: 15px;
     }
 
     .container {
-      max-width: 900px;
+      max-width: 950px;
       margin: auto;
       padding: 20px 15px;
     }
 
-    .titulo {
-      text-align: center;
+    .busca {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
       margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .busca input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .categorias {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .categoria {
+      background: white;
+      border-radius: 10px;
+      padding: 12px 15px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+      font-weight: bold;
+    }
+
+    .titulo {
+      margin-bottom: 15px;
     }
 
     .titulo h2 {
       font-size: 24px;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
     }
 
     .titulo p {
@@ -60,7 +92,7 @@
       background: white;
       border-radius: 12px;
       padding: 20px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
@@ -69,14 +101,15 @@
       margin-bottom: 10px;
     }
 
-    .preco {
-      font-size: 25px;
-      font-weight: bold;
-      margin: 12px 0;
+    .produto p {
+      color: #666;
+      margin-bottom: 12px;
+      line-height: 1.5;
     }
 
-    .descricao {
-      color: #666;
+    .preco {
+      font-size: 24px;
+      font-weight: bold;
       margin-bottom: 15px;
     }
 
@@ -108,44 +141,61 @@
 
 <body>
 
-  <header>
-    <h1>PreçoNexo</h1>
-    <p>Compare ofertas e encontre os melhores preços</p>
-  </header>
+<header>
+  <h1>PreçoNexo</h1>
+  <p>Compare ofertas e encontre os melhores preços</p>
+</header>
 
-  <main class="container">
+<main class="container">
 
-    <div class="titulo">
-      <h2>🔥 Ofertas do Dia</h2>
-      <p>Produtos selecionados para você</p>
+  <div class="busca">
+    <input
+      type="text"
+      placeholder="🔎 O que você está procurando?"
+    >
+  </div>
+
+  <div class="categorias">
+    <div class="categoria">📱 Celulares</div>
+    <div class="categoria">💻 Informática</div>
+    <div class="categoria">🏠 Casa</div>
+    <div class="categoria">👕 Moda</div>
+    <div class="categoria">🔧 Ferramentas</div>
+    <div class="categoria">🎮 Games</div>
+  </div>
+
+  <div class="titulo">
+    <h2>🔥 Ofertas do Dia</h2>
+    <p>Produtos selecionados para você</p>
+  </div>
+
+  <div class="produto">
+    <h3>Oferta em destaque</h3>
+
+    <p>
+      Encontre produtos com preços atrativos
+      através dos nossos parceiros.
+    </p>
+
+    <div class="preco">
+      Confira o preço
     </div>
 
-    <div class="produto">
-      <h3>Oferta em destaque</h3>
+    <a
+      class="botao"
+      href="https://meli.la/1UdTcgx"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      🛒 Ver oferta
+    </a>
+  </div>
 
-      <p class="descricao">
-        Encontre este produto no Mercado Livre através do nosso link de afiliado.
-      </p>
+</main>
 
-      <div class="preco">
-        Confira o preço
-      </div>
-
-      <a
-        class="botao"
-        href="https://meli.la/1UdTcgx"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        🛒 Ver oferta
-      </a>
-    </div>
-
-  </main>
-
-  <footer>
-    © 2026 PreçoNexo — Ofertas e comparação de preços
-  </footer>
+<footer>
+  © 2026 PreçoNexo — Ofertas e comparação de preços
+</footer>
 
 </body>
 </html>
