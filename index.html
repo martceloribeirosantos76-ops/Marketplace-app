@@ -3,23 +3,149 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PreçoNexo - Compare Ofertas</title>
+
+  <title>PreçoNexo - Ofertas e Melhores Preços</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    header {
+      background: #111827;
+      color: white;
+      padding: 22px 15px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 30px;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      font-size: 15px;
+      color: #d1d5db;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px 15px;
+    }
+
+    .titulo {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .titulo h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .titulo p {
+      color: #666;
+    }
+
+    .produto {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .produto h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .preco {
+      font-size: 25px;
+      font-weight: bold;
+      margin: 12px 0;
+    }
+
+    .descricao {
+      color: #666;
+      margin-bottom: 15px;
+    }
+
+    .botao {
+      display: block;
+      width: 100%;
+      background: #16a34a;
+      color: white;
+      text-decoration: none;
+      text-align: center;
+      padding: 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 17px;
+    }
+
+    .botao:hover {
+      background: #15803d;
+    }
+
+    footer {
+      text-align: center;
+      padding: 25px 15px;
+      color: #777;
+      font-size: 13px;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>PreçoNexo</h1>
-  <h2>Compare ofertas e encontre os melhores preços</h2>
 
-  <p>
-    O PreçoNexo é uma plataforma de comparação de ofertas
-    que reúne produtos e preços de diferentes lojas.
-  </p>
+  <header>
+    <h1>PreçoNexo</h1>
+    <p>Compare ofertas e encontre os melhores preços</p>
+  </header>
 
-  <p>
-    Encontre ofertas, compare preços e seja direcionado
-    para os sites dos nossos parceiros.
-  </p>
+  <main class="container">
 
-  <h3>Ofertas do dia</h3>
-  <p>Em breve, os melhores produtos e ofertas estarão aqui.</p>
+    <div class="titulo">
+      <h2>🔥 Ofertas do Dia</h2>
+      <p>Produtos selecionados para você</p>
+    </div>
+
+    <div class="produto">
+      <h3>Oferta em destaque</h3>
+
+      <p class="descricao">
+        Encontre este produto no Mercado Livre através do nosso link de afiliado.
+      </p>
+
+      <div class="preco">
+        Confira o preço
+      </div>
+
+      <a
+        class="botao"
+        href="https://meli.la/1UdTcgx"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        🛒 Ver oferta
+      </a>
+    </div>
+
+  </main>
+
+  <footer>
+    © 2026 PreçoNexo — Ofertas e comparação de preços
+  </footer>
+
 </body>
 </html>
