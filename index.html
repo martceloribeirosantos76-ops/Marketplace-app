@@ -183,8 +183,9 @@
   </div>  <div class="titulo">
     <h2>🔥 Ofertas do Dia</h2>
     <p>Produtos selecionados para você</p>
-  </div>  <div class="produto">
-    <h3>Oferta em destaque</h3><p>
+  </div>  <div class="produto"><h3>Oferta em destaque</h3>
+
+<p>
   Encontre produtos com preços atrativos
   através dos nossos parceiros.
 </p>
@@ -202,8 +203,9 @@
   🛒 Ver oferta
 </a>
 
-  </div>  <div class="produto">
-    <h3>🔐 Conectar Mercado Livre</h3><p>
+  </div>  <div class="produto"><h3>🔐 Conectar Mercado Livre</h3>
+
+<p>
   Conecte sua conta do Mercado Livre ao PreçoNexo
   para permitir o acesso seguro às funcionalidades da API.
 </p>
@@ -216,12 +218,23 @@
   🔐 Conectar Mercado Livre
 </button>
 
-<div id="oauthStatus" class="status"></div>
+<div
+  id="oauthStatus"
+  class="status"
+></div>
 
   </div></main><footer>
   © 2026 PreçoNexo — Ofertas e comparação de preços
 </footer><script>
-  const CLIENT_ID = "7012728545845567";
+
+  /*
+   * =====================================================
+   * CONFIGURAÇÃO DO MERCADO LIVRE
+   * =====================================================
+   */
+
+  const CLIENT_ID =
+    "7012728545845567";
 
   const REDIRECT_URI =
     "https://martceloribeirosantos76-ops.github.io/Marketplace-app/";
@@ -229,189 +242,555 @@
   const AUTHORIZATION_URL =
     "https://auth.mercadolivre.com.br/authorization";
 
+
+  /*
+   * =====================================================
+   * ELEMENTOS DA PÁGINA
+   * =====================================================
+   */
+
   const btnMercadoLivre =
-    document.getElementById("btnMercadoLivre");
+    document.getElementById(
+      "btnMercadoLivre"
+    );
 
   const oauthStatus =
-    document.getElementById("oauthStatus");
+    document.getElementById(
+      "oauthStatus"
+    );
 
 
-  function mostrarStatus(mensagem, tipo) {
-    oauthStatus.textContent = mensagem;
-    oauthStatus.className = "status " + tipo;
+  /*
+   * =====================================================
+   * MOSTRAR MENSAGEM
+   * =====================================================
+   */
+
+  function mostrarStatus(
+    mensagem,
+    tipo
+  ) {
+
+    oauthStatus.textContent =
+      mensagem;
+
+    oauthStatus.className =
+      "status " + tipo;
+
   }
 
 
-  function gerarRandomString(tamanho = 64) {
+  /*
+   * =====================================================
+   * GERAR STRING ALEATÓRIA
+   * =====================================================
+   */
+
+  function gerarRandomString(
+    tamanho = 64
+  ) {
+
     const caracteres =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
     const valores =
-      new Uint8Array(tamanho);
+      new Uint8Array(
+        tamanho
+      );
 
-    crypto.getRandomValues(valores);
+    crypto.getRandomValues(
+      valores
+    );
 
     let resultado = "";
 
-    for (let i = 0; i < valores.length; i++) {
-      resultado += caracteres[
-        valores[i] % caracteres.length
-      ];
+    for (
+      let i = 0;
+      i < valores.length;
+      i++
+    ) {
+
+      resultado +=
+        caracteres[
+          valores[i] %
+          caracteres.length
+        ];
+
     }
 
     return resultado;
   }
 
 
-  function base64UrlEncode(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
+  /*
+   * =====================================================
+   * BASE64 URL SAFE
+   * =====================================================
+   */
+
+  function base64UrlEncode(
+    arrayBuffer
+  ) {
+
+    const bytes =
+      new Uint8Array(
+        arrayBuffer
+      );
 
     let string = "";
 
-    for (const byte of bytes) {
-      string += String.fromCharCode(byte);
+    for (
+      const byte of bytes
+    ) {
+
+      string +=
+        String.fromCharCode(
+          byte
+        );
+
     }
 
     return btoa(string)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
+      .replace(
+        /\+/g,
+        "-"
+      )
+      .replace(
+        /\//g,
+        "_"
+      )
+      .replace(
+        /=+$/,
+        ""
+      );
   }
 
 
-  async function gerarCodeChallenge(codeVerifier) {
-    const encoder = new TextEncoder();
+  /*
+   * =====================================================
+   * GERAR CODE CHALLENGE
+   * =====================================================
+   */
 
-    const data = encoder.encode(codeVerifier);
+  async function gerarCodeChallenge(
+    codeVerifier
+  ) {
+
+    const encoder =
+      new TextEncoder();
+
+    const data =
+      encoder.encode(
+        codeVerifier
+      );
 
     const digest =
-      await crypto.subtle.digest("SHA-256", data);
+      await crypto.subtle.digest(
+        "SHA-256",
+        data
+      );
 
-    return base64UrlEncode(digest);
+    return base64UrlEncode(
+      digest
+    );
+
   }
 
 
+  /*
+   * =====================================================
+   * INICIAR OAUTH
+   * =====================================================
+   */
+
   async function iniciarOAuth() {
+
     try {
+
       mostrarStatus(
         "Preparando conexão segura com o Mercado Livre...",
         "sucesso"
       );
 
+
+      /*
+       * Criamos um novo code_verifier.
+       */
+
       const codeVerifier =
         gerarRandomString(64);
 
+
+      /*
+       * Criamos um novo state.
+       */
+
       const state =
-        gerarRandomString(32);
+        gerarRandomString(64);
+
+
+      /*
+       * Criamos o code_challenge.
+       */
 
       const codeChallenge =
-        await gerarCodeChallenge(codeVerifier);
+        await gerarCodeChallenge(
+          codeVerifier
+        );
 
 
-      sessionStorage.setItem(
-        "ml_code_verifier",
-        codeVerifier
+      /*
+       * Limpamos qualquer tentativa
+       * anterior.
+       */
+
+      sessionStorage.removeItem(
+        "preco_nexo_authorization_code"
       );
 
+
+      sessionStorage.removeItem(
+        "preco_nexo_state"
+      );
+
+
+      sessionStorage.removeItem(
+        "preco_nexo_code_verifier"
+      );
+
+
+      /*
+       * Guardamos o state.
+       */
+
       sessionStorage.setItem(
-        "ml_oauth_state",
+        "preco_nexo_state",
         state
       );
 
 
-      const params = new URLSearchParams({
-        response_type: "code",
-        client_id: CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-        state: state
-      });
+      /*
+       * Guardamos o code_verifier.
+       */
+
+      sessionStorage.setItem(
+        "preco_nexo_code_verifier",
+        codeVerifier
+      );
 
 
-      window.location.href =
-        AUTHORIZATION_URL + "?" + params.toString();
+      /*
+       * Criamos os parâmetros
+       * da autorização.
+       */
+
+      const params =
+        new URLSearchParams();
+
+
+      params.set(
+        "response_type",
+        "code"
+      );
+
+
+      params.set(
+        "client_id",
+        CLIENT_ID
+      );
+
+
+      params.set(
+        "redirect_uri",
+        REDIRECT_URI
+      );
+
+
+      params.set(
+        "code_challenge",
+        codeChallenge
+      );
+
+
+      params.set(
+        "code_challenge_method",
+        "S256"
+      );
+
+
+      params.set(
+        "state",
+        state
+      );
+
+
+      /*
+       * Montamos a URL final.
+       */
+
+      const url =
+        AUTHORIZATION_URL +
+        "?" +
+        params.toString();
+
+
+      /*
+       * Redirecionamos para o
+       * Mercado Livre.
+       */
+
+      window.location.assign(
+        url
+      );
 
     } catch (erro) {
 
-      console.error(erro);
+      console.error(
+        "Erro ao iniciar OAuth:",
+        erro
+      );
 
       mostrarStatus(
         "Não foi possível iniciar a conexão com o Mercado Livre.",
         "erro"
       );
+
     }
+
   }
 
+
+  /*
+   * =====================================================
+   * PROCESSAR RETORNO DO MERCADO LIVRE
+   * =====================================================
+   */
 
   function processarRetornoOAuth() {
 
     const urlParams =
-      new URLSearchParams(window.location.search);
+      new URLSearchParams(
+        window.location.search
+      );
+
+
+    /*
+     * Código de autorização.
+     */
 
     const code =
-      urlParams.get("code");
+      urlParams.get(
+        "code"
+      );
 
-    const state =
-      urlParams.get("state");
+
+    /*
+     * State retornado.
+     */
+
+    const stateRecebido =
+      urlParams.get(
+        "state"
+      );
+
+
+    /*
+     * Possível erro.
+     */
 
     const error =
-      urlParams.get("error");
+      urlParams.get(
+        "error"
+      );
+
+
+    /*
+     * Descrição do erro.
+     */
 
     const errorDescription =
-      urlParams.get("error_description");
+      urlParams.get(
+        "error_description"
+      );
 
+
+    /*
+     * Se não existe resposta OAuth,
+     * não fazemos nada.
+     */
+
+    if (
+      !code &&
+      !stateRecebido &&
+      !error
+    ) {
+
+      return;
+
+    }
+
+
+    /*
+     * Caso o Mercado Livre tenha
+     * retornado um erro.
+     */
 
     if (error) {
 
+      console.error(
+        "Erro do Mercado Livre:",
+        error,
+        errorDescription
+      );
+
+
       mostrarStatus(
         "O Mercado Livre recusou ou interrompeu a autorização: " +
-        (errorDescription || error),
+        (
+          errorDescription ||
+          error
+        ),
         "erro"
       );
 
+
       return;
+
     }
 
+
+    /*
+     * Precisamos do code.
+     */
 
     if (!code) {
+
+      mostrarStatus(
+        "O Mercado Livre retornou uma resposta sem código de autorização.",
+        "erro"
+      );
+
+
       return;
+
     }
 
 
-    const stateEsperado =
-      sessionStorage.getItem("ml_oauth_state");
+    /*
+     * Recuperamos o state original.
+     */
 
-    if (!stateEsperado || state !== stateEsperado) {
+    const stateEsperado =
+      sessionStorage.getItem(
+        "preco_nexo_state"
+      );
+
+
+    /*
+     * Verificação de segurança.
+     */
+
+    if (
+      !stateEsperado ||
+      !stateRecebido ||
+      stateRecebido !== stateEsperado
+    ) {
+
+      console.error(
+        "Falha na validação do state."
+      );
+
 
       mostrarStatus(
         "Erro de segurança: o estado da autorização não corresponde à solicitação iniciada pelo PreçoNexo.",
         "erro"
       );
 
+
       return;
+
     }
 
 
+    /*
+     * Recuperamos o code_verifier.
+     */
+
+    const codeVerifier =
+      sessionStorage.getItem(
+        "preco_nexo_code_verifier"
+      );
+
+
+    /*
+     * Se não existir,
+     * precisamos iniciar novamente.
+     */
+
+    if (!codeVerifier) {
+
+      mostrarStatus(
+        "O código de verificação PKCE não foi encontrado. Inicie a autorização novamente.",
+        "erro"
+      );
+
+
+      return;
+
+    }
+
+
+    /*
+     * Guardamos temporariamente
+     * o authorization code.
+     */
+
     sessionStorage.setItem(
-      "ml_authorization_code",
+      "preco_nexo_authorization_code",
       code
     );
 
 
+    /*
+     * Mantemos o verifier disponível
+     * para a próxima etapa.
+     */
+
+    sessionStorage.setItem(
+      "preco_nexo_code_verifier",
+      codeVerifier
+    );
+
+
+    /*
+     * Sucesso.
+     */
+
     mostrarStatus(
-      "✅ Autorização recebida com sucesso. O código foi recebido pelo PreçoNexo. Agora vamos enviá-lo ao servidor seguro para obter os tokens.",
+      "✅ Autorização recebida com sucesso! O PreçoNexo recebeu o código do Mercado Livre.",
       "sucesso"
     );
 
+
+    /*
+     * Removemos code e state
+     * da barra de endereço.
+     */
 
     window.history.replaceState(
       {},
       document.title,
       REDIRECT_URI
     );
+
   }
 
+
+  /*
+   * =====================================================
+   * BOTÃO
+   * =====================================================
+   */
 
   btnMercadoLivre.addEventListener(
     "click",
@@ -419,6 +798,14 @@
   );
 
 
+  /*
+   * =====================================================
+   * VERIFICAR SE ESTAMOS VOLTANDO
+   * DO MERCADO LIVRE
+   * =====================================================
+   */
+
   processarRetornoOAuth();
+
 </script></body>
 </html>
