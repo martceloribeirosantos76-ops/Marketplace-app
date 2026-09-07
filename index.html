@@ -1,12 +1,7 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE html><html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>PreçoNexo - Ofertas e Melhores Preços</title>
-
-  <style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <title>PreçoNexo - Ofertas e Melhores Preços</title>  <style>
     * {
       box-sizing: border-box;
       margin: 0;
@@ -124,10 +119,44 @@
       border-radius: 8px;
       font-weight: bold;
       font-size: 17px;
+      border: none;
+      cursor: pointer;
     }
 
     .botao:hover {
       background: #15803d;
+    }
+
+    .botao-oauth {
+      background: #3483fa;
+      margin-top: 15px;
+    }
+
+    .botao-oauth:hover {
+      background: #2968c8;
+    }
+
+    .status {
+      display: none;
+      margin-top: 15px;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status.sucesso {
+      display: block;
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .status.erro {
+      display: block;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
     }
 
     footer {
@@ -136,66 +165,260 @@
       color: #777;
       font-size: 13px;
     }
-  </style>
-</head>
-
-<body>
-
-<header>
+  </style></head><body><header>
   <h1>PreçoNexo</h1>
   <p>Compare ofertas e encontre os melhores preços</p>
-</header>
-
-<main class="container">
-
-  <div class="busca">
+</header><main class="container">  <div class="busca">
     <input
       type="text"
       placeholder="🔎 O que você está procurando?"
     >
-  </div>
-
-  <div class="categorias">
+  </div>  <div class="categorias">
     <div class="categoria">📱 Celulares</div>
     <div class="categoria">💻 Informática</div>
     <div class="categoria">🏠 Casa</div>
     <div class="categoria">👕 Moda</div>
     <div class="categoria">🔧 Ferramentas</div>
     <div class="categoria">🎮 Games</div>
-  </div>
-
-  <div class="titulo">
+  </div>  <div class="titulo">
     <h2>🔥 Ofertas do Dia</h2>
     <p>Produtos selecionados para você</p>
-  </div>
+  </div>  <div class="produto">
+    <h3>Oferta em destaque</h3><p>
+  Encontre produtos com preços atrativos
+  através dos nossos parceiros.
+</p>
 
-  <div class="produto">
-    <h3>Oferta em destaque</h3>
+<div class="preco">
+  Confira o preço
+</div>
 
-    <p>
-      Encontre produtos com preços atrativos
-      através dos nossos parceiros.
-    </p>
+<a
+  class="botao"
+  href="https://meli.la/1UdTcgx"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  🛒 Ver oferta
+</a>
 
-    <div class="preco">
-      Confira o preço
-    </div>
+  </div>  <div class="produto">
+    <h3>🔐 Conectar Mercado Livre</h3><p>
+  Conecte sua conta do Mercado Livre ao PreçoNexo
+  para permitir o acesso seguro às funcionalidades da API.
+</p>
 
-    <a
-      class="botao"
-      href="https://meli.la/1UdTcgx"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      🛒 Ver oferta
-    </a>
-  </div>
+<button
+  id="btnMercadoLivre"
+  class="botao botao-oauth"
+  type="button"
+>
+  🔐 Conectar Mercado Livre
+</button>
 
-</main>
+<div id="oauthStatus" class="status"></div>
 
-<footer>
+  </div></main><footer>
   © 2026 PreçoNexo — Ofertas e comparação de preços
-</footer>
+</footer><script>
+  const CLIENT_ID = "7012728545845567";
 
-</body>
+  const REDIRECT_URI =
+    "https://martceloribeirosantos76-ops.github.io/Marketplace-app/";
+
+  const AUTHORIZATION_URL =
+    "https://auth.mercadolivre.com.br/authorization";
+
+  const btnMercadoLivre =
+    document.getElementById("btnMercadoLivre");
+
+  const oauthStatus =
+    document.getElementById("oauthStatus");
+
+
+  function mostrarStatus(mensagem, tipo) {
+    oauthStatus.textContent = mensagem;
+    oauthStatus.className = "status " + tipo;
+  }
+
+
+  function gerarRandomString(tamanho = 64) {
+    const caracteres =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+
+    const valores =
+      new Uint8Array(tamanho);
+
+    crypto.getRandomValues(valores);
+
+    let resultado = "";
+
+    for (let i = 0; i < valores.length; i++) {
+      resultado += caracteres[
+        valores[i] % caracteres.length
+      ];
+    }
+
+    return resultado;
+  }
+
+
+  function base64UrlEncode(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+
+    let string = "";
+
+    for (const byte of bytes) {
+      string += String.fromCharCode(byte);
+    }
+
+    return btoa(string)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+
+  async function gerarCodeChallenge(codeVerifier) {
+    const encoder = new TextEncoder();
+
+    const data = encoder.encode(codeVerifier);
+
+    const digest =
+      await crypto.subtle.digest("SHA-256", data);
+
+    return base64UrlEncode(digest);
+  }
+
+
+  async function iniciarOAuth() {
+    try {
+      mostrarStatus(
+        "Preparando conexão segura com o Mercado Livre...",
+        "sucesso"
+      );
+
+      const codeVerifier =
+        gerarRandomString(64);
+
+      const state =
+        gerarRandomString(32);
+
+      const codeChallenge =
+        await gerarCodeChallenge(codeVerifier);
+
+
+      sessionStorage.setItem(
+        "ml_code_verifier",
+        codeVerifier
+      );
+
+      sessionStorage.setItem(
+        "ml_oauth_state",
+        state
+      );
+
+
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        state: state
+      });
+
+
+      window.location.href =
+        AUTHORIZATION_URL + "?" + params.toString();
+
+    } catch (erro) {
+
+      console.error(erro);
+
+      mostrarStatus(
+        "Não foi possível iniciar a conexão com o Mercado Livre.",
+        "erro"
+      );
+    }
+  }
+
+
+  function processarRetornoOAuth() {
+
+    const urlParams =
+      new URLSearchParams(window.location.search);
+
+    const code =
+      urlParams.get("code");
+
+    const state =
+      urlParams.get("state");
+
+    const error =
+      urlParams.get("error");
+
+    const errorDescription =
+      urlParams.get("error_description");
+
+
+    if (error) {
+
+      mostrarStatus(
+        "O Mercado Livre recusou ou interrompeu a autorização: " +
+        (errorDescription || error),
+        "erro"
+      );
+
+      return;
+    }
+
+
+    if (!code) {
+      return;
+    }
+
+
+    const stateEsperado =
+      sessionStorage.getItem("ml_oauth_state");
+
+    if (!stateEsperado || state !== stateEsperado) {
+
+      mostrarStatus(
+        "Erro de segurança: o estado da autorização não corresponde à solicitação iniciada pelo PreçoNexo.",
+        "erro"
+      );
+
+      return;
+    }
+
+
+    sessionStorage.setItem(
+      "ml_authorization_code",
+      code
+    );
+
+
+    mostrarStatus(
+      "✅ Autorização recebida com sucesso. O código foi recebido pelo PreçoNexo. Agora vamos enviá-lo ao servidor seguro para obter os tokens.",
+      "sucesso"
+    );
+
+
+    window.history.replaceState(
+      {},
+      document.title,
+      REDIRECT_URI
+    );
+  }
+
+
+  btnMercadoLivre.addEventListener(
+    "click",
+    iniciarOAuth
+  );
+
+
+  processarRetornoOAuth();
+</script></body>
 </html>
