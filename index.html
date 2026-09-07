@@ -229,7 +229,7 @@
 
   /*
    * =====================================================
-   * CONFIGURAÇÃO DO MERCADO LIVRE
+   * CONFIGURAÇÃO
    * =====================================================
    */
 
@@ -245,24 +245,20 @@
 
   /*
    * =====================================================
-   * ELEMENTOS DA PÁGINA
+   * ELEMENTOS
    * =====================================================
    */
 
   const btnMercadoLivre =
-    document.getElementById(
-      "btnMercadoLivre"
-    );
+    document.getElementById("btnMercadoLivre");
 
   const oauthStatus =
-    document.getElementById(
-      "oauthStatus"
-    );
+    document.getElementById("oauthStatus");
 
 
   /*
    * =====================================================
-   * MOSTRAR MENSAGEM
+   * STATUS
    * =====================================================
    */
 
@@ -276,13 +272,12 @@
 
     oauthStatus.className =
       "status " + tipo;
-
   }
 
 
   /*
    * =====================================================
-   * GERAR STRING ALEATÓRIA
+   * STRING ALEATÓRIA
    * =====================================================
    */
 
@@ -294,13 +289,9 @@
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
     const valores =
-      new Uint8Array(
-        tamanho
-      );
+      new Uint8Array(tamanho);
 
-    crypto.getRandomValues(
-      valores
-    );
+    crypto.getRandomValues(valores);
 
     let resultado = "";
 
@@ -315,7 +306,6 @@
           valores[i] %
           caracteres.length
         ];
-
     }
 
     return resultado;
@@ -333,9 +323,7 @@
   ) {
 
     const bytes =
-      new Uint8Array(
-        arrayBuffer
-      );
+      new Uint8Array(arrayBuffer);
 
     let string = "";
 
@@ -344,31 +332,19 @@
     ) {
 
       string +=
-        String.fromCharCode(
-          byte
-        );
-
+        String.fromCharCode(byte);
     }
 
     return btoa(string)
-      .replace(
-        /\+/g,
-        "-"
-      )
-      .replace(
-        /\//g,
-        "_"
-      )
-      .replace(
-        /=+$/,
-        ""
-      );
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
   }
 
 
   /*
    * =====================================================
-   * GERAR CODE CHALLENGE
+   * CODE CHALLENGE
    * =====================================================
    */
 
@@ -380,9 +356,7 @@
       new TextEncoder();
 
     const data =
-      encoder.encode(
-        codeVerifier
-      );
+      encoder.encode(codeVerifier);
 
     const digest =
       await crypto.subtle.digest(
@@ -390,10 +364,82 @@
         data
       );
 
-    return base64UrlEncode(
-      digest
-    );
+    return base64UrlEncode(digest);
+  }
 
+
+  /*
+   * =====================================================
+   * COOKIE
+   *
+   * Usamos cookie temporário para que o state
+   * sobreviva ao redirecionamento OAuth.
+   * =====================================================
+   */
+
+  function definirCookie(
+    nome,
+    valor,
+    segundos = 600
+  ) {
+
+    document.cookie =
+      nome +
+      "=" +
+      encodeURIComponent(valor) +
+      "; Max-Age=" +
+      segundos +
+      "; Path=/; Secure; SameSite=Lax";
+  }
+
+
+  /*
+   * =====================================================
+   * LER COOKIE
+   * =====================================================
+   */
+
+  function obterCookie(nome) {
+
+    const cookies =
+      document.cookie.split(";");
+
+    for (
+      const cookie of cookies
+    ) {
+
+      const partes =
+        cookie.trim().split("=");
+
+      const chave =
+        partes.shift();
+
+      const valor =
+        partes.join("=");
+
+      if (
+        chave === nome
+      ) {
+
+        return decodeURIComponent(valor);
+      }
+    }
+
+    return null;
+  }
+
+
+  /*
+   * =====================================================
+   * APAGAR COOKIE
+   * =====================================================
+   */
+
+  function apagarCookie(nome) {
+
+    document.cookie =
+      nome +
+      "=; Max-Age=0; Path=/; Secure; SameSite=Lax";
   }
 
 
@@ -414,7 +460,7 @@
 
 
       /*
-       * Criamos um novo code_verifier.
+       * Gera um novo verifier.
        */
 
       const codeVerifier =
@@ -422,7 +468,7 @@
 
 
       /*
-       * Criamos um novo state.
+       * Gera um novo state.
        */
 
       const state =
@@ -430,7 +476,7 @@
 
 
       /*
-       * Criamos o code_challenge.
+       * Gera o challenge.
        */
 
       const codeChallenge =
@@ -440,93 +486,60 @@
 
 
       /*
-       * Limpamos qualquer tentativa
-       * anterior.
+       * Guarda os valores em cookies
+       * temporários.
        */
 
-      sessionStorage.removeItem(
-        "preco_nexo_authorization_code"
-      );
-
-
-      sessionStorage.removeItem(
-        "preco_nexo_state"
-      );
-
-
-      sessionStorage.removeItem(
-        "preco_nexo_code_verifier"
-      );
-
-
-      /*
-       * Guardamos o state.
-       */
-
-      sessionStorage.setItem(
+      definirCookie(
         "preco_nexo_state",
-        state
+        state,
+        600
       );
 
-
-      /*
-       * Guardamos o code_verifier.
-       */
-
-      sessionStorage.setItem(
+      definirCookie(
         "preco_nexo_code_verifier",
-        codeVerifier
+        codeVerifier,
+        600
       );
 
 
       /*
-       * Criamos os parâmetros
-       * da autorização.
+       * Monta a URL do Mercado Livre.
        */
 
       const params =
         new URLSearchParams();
-
 
       params.set(
         "response_type",
         "code"
       );
 
-
       params.set(
         "client_id",
         CLIENT_ID
       );
-
 
       params.set(
         "redirect_uri",
         REDIRECT_URI
       );
 
-
       params.set(
         "code_challenge",
         codeChallenge
       );
-
 
       params.set(
         "code_challenge_method",
         "S256"
       );
 
-
       params.set(
         "state",
         state
       );
 
-
-      /*
-       * Montamos a URL final.
-       */
 
       const url =
         AUTHORIZATION_URL +
@@ -535,13 +548,11 @@
 
 
       /*
-       * Redirecionamos para o
-       * Mercado Livre.
+       * Vai para o Mercado Livre.
        */
 
-      window.location.assign(
-        url
-      );
+      window.location.href =
+        url;
 
     } catch (erro) {
 
@@ -554,15 +565,13 @@
         "Não foi possível iniciar a conexão com o Mercado Livre.",
         "erro"
       );
-
     }
-
   }
 
 
   /*
    * =====================================================
-   * PROCESSAR RETORNO DO MERCADO LIVRE
+   * PROCESSAR RETORNO
    * =====================================================
    */
 
@@ -574,49 +583,21 @@
       );
 
 
-    /*
-     * Código de autorização.
-     */
-
     const code =
-      urlParams.get(
-        "code"
-      );
-
-
-    /*
-     * State retornado.
-     */
+      urlParams.get("code");
 
     const stateRecebido =
-      urlParams.get(
-        "state"
-      );
-
-
-    /*
-     * Possível erro.
-     */
+      urlParams.get("state");
 
     const error =
-      urlParams.get(
-        "error"
-      );
-
-
-    /*
-     * Descrição do erro.
-     */
+      urlParams.get("error");
 
     const errorDescription =
-      urlParams.get(
-        "error_description"
-      );
+      urlParams.get("error_description");
 
 
     /*
-     * Se não existe resposta OAuth,
-     * não fazemos nada.
+     * Visita normal à página.
      */
 
     if (
@@ -626,23 +607,20 @@
     ) {
 
       return;
-
     }
 
 
     /*
-     * Caso o Mercado Livre tenha
-     * retornado um erro.
+     * Erro retornado pelo Mercado Livre.
      */
 
     if (error) {
 
       console.error(
-        "Erro do Mercado Livre:",
+        "Erro Mercado Livre:",
         error,
         errorDescription
       );
-
 
       mostrarStatus(
         "O Mercado Livre recusou ou interrompeu a autorização: " +
@@ -653,14 +631,12 @@
         "erro"
       );
 
-
       return;
-
     }
 
 
     /*
-     * Precisamos do code.
+     * Precisamos do authorization code.
      */
 
     if (!code) {
@@ -670,24 +646,22 @@
         "erro"
       );
 
-
       return;
-
     }
 
 
     /*
-     * Recuperamos o state original.
+     * Recupera o state original.
      */
 
     const stateEsperado =
-      sessionStorage.getItem(
+      obterCookie(
         "preco_nexo_state"
       );
 
 
     /*
-     * Verificação de segurança.
+     * Validação do state.
      */
 
     if (
@@ -697,64 +671,57 @@
     ) {
 
       console.error(
-        "Falha na validação do state."
+        "Falha na validação do state.",
+        {
+          stateEsperadoExiste:
+            !!stateEsperado,
+
+          stateRecebidoExiste:
+            !!stateRecebido
+        }
       );
 
-
       mostrarStatus(
-        "Erro de segurança: o estado da autorização não corresponde à solicitação iniciada pelo PreçoNexo.",
+        "Erro de segurança: não foi possível validar esta autorização. Inicie novamente pelo botão do PreçoNexo.",
         "erro"
       );
 
-
       return;
-
     }
 
 
     /*
-     * Recuperamos o code_verifier.
+     * Recupera o code_verifier.
      */
 
     const codeVerifier =
-      sessionStorage.getItem(
+      obterCookie(
         "preco_nexo_code_verifier"
       );
 
 
-    /*
-     * Se não existir,
-     * precisamos iniciar novamente.
-     */
-
     if (!codeVerifier) {
 
       mostrarStatus(
-        "O código de verificação PKCE não foi encontrado. Inicie a autorização novamente.",
+        "O código PKCE não foi encontrado. Inicie a autorização novamente.",
         "erro"
       );
 
-
       return;
-
     }
 
 
     /*
-     * Guardamos temporariamente
-     * o authorization code.
+     * Guarda temporariamente os dados
+     * necessários para a próxima etapa.
+     *
+     * NÃO mostramos o code na tela.
      */
 
     sessionStorage.setItem(
       "preco_nexo_authorization_code",
       code
     );
-
-
-    /*
-     * Mantemos o verifier disponível
-     * para a próxima etapa.
-     */
 
     sessionStorage.setItem(
       "preco_nexo_code_verifier",
@@ -763,18 +730,30 @@
 
 
     /*
-     * Sucesso.
+     * Apaga os cookies temporários.
+     */
+
+    apagarCookie(
+      "preco_nexo_state"
+    );
+
+    apagarCookie(
+      "preco_nexo_code_verifier"
+    );
+
+
+    /*
+     * Mostra sucesso.
      */
 
     mostrarStatus(
-      "✅ Autorização recebida com sucesso! O PreçoNexo recebeu o código do Mercado Livre.",
+      "✅ Autorização recebida com sucesso! O código do Mercado Livre foi recebido pelo PreçoNexo.",
       "sucesso"
     );
 
 
     /*
-     * Removemos code e state
-     * da barra de endereço.
+     * Remove code/state da URL.
      */
 
     window.history.replaceState(
@@ -782,13 +761,12 @@
       document.title,
       REDIRECT_URI
     );
-
   }
 
 
   /*
    * =====================================================
-   * BOTÃO
+   * EVENTO DO BOTÃO
    * =====================================================
    */
 
@@ -800,8 +778,7 @@
 
   /*
    * =====================================================
-   * VERIFICAR SE ESTAMOS VOLTANDO
-   * DO MERCADO LIVRE
+   * VERIFICA RETORNO
    * =====================================================
    */
 
