@@ -575,7 +575,7 @@
    * =====================================================
    */
 
-  function processarRetornoOAuth() {
+ async function processarRetornoOAuth() {
 
     const urlParams =
       new URLSearchParams(
@@ -723,47 +723,96 @@
       code
     );
 
-    sessionStorage.setItem(
-      "preco_nexo_code_verifier",
-      codeVerifier
-    );
-
-
-    /*
-     * Apaga os cookies temporários.
+    /* 
+     * Envia o código de autorização e o code_verifier
+     * para a Edge Function do Supabase.
      */
+    try {
+      mostrarStatus(
+        "🔄 Finalizando conexão com o Mercado Livre...",
+        "sucesso"
+      );
 
-    apagarCookie(
-      "preco_nexo_state"
-    );
+      const response = await fetch(
+        https://iwjnkguatgumdcfpytpu.supabase.co/functions/v1/mercadolivre-oauth
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            code: code,
+            code_verifier: codeVerifier
+          })
+        }
+      );
 
-    apagarCookie(
-      "preco_nexo_code_verifier"
-    );
+      const data = await response.json();
 
+      if (!response.ok || !data.success) {
+        console.error(
+          "Erro na Edge Function:",
+          data
+        );
 
-    /*
-     * Mostra sucesso.
-     */
+        mostrarStatus(
+          "❌ Não foi possível concluir a conexão com o Mercado Livre.",
+          "erro"
+        );
 
-    mostrarStatus(
-      "✅ Autorização recebida com sucesso! O código do Mercado Livre foi recebido pelo PreçoNexo.",
-      "sucesso"
-    );
+        return;
+      }
 
+      /*
+       * Guarda apenas informações não sensíveis
+       * para o estado visual da aplicação.
+       */
+      sessionStorage.setItem(
+        "preco_nexo_ml_user_id",
+        String(data.user_id || "")
+      );
 
-    /*
-     * Remove code/state da URL.
-     */
+      /*
+       * Apaga os cookies temporários.
+       */
+      apagarCookie(
+        "preco_nexo_state"
+      );
 
-    window.history.replaceState(
-      {},
-      document.title,
-      REDIRECT_URI
-    );
+      apagarCookie(
+        "preco_nexo_code_verifier"
+      );
+
+      /*
+       * Mostra sucesso somente depois
+       * da confirmação da Edge Function.
+       */
+      mostrarStatus(
+        "✅ Mercado Livre conectado com sucesso!",
+        "sucesso"
+      );
+
+      /*
+       * Remove code/state da URL.
+       */
+      window.history.replaceState(
+        {},
+        document.title,
+        REDIRECT_URI
+      );
+
+    } catch (erro) {
+      console.error(
+        "Erro ao comunicar com a Edge Function:",
+        erro
+      );
+
+      mostrarStatus(
+        "❌ Erro ao finalizar a conexão com o Mercado Livre.",
+        "erro"
+      );
+    }
   }
-
-
   /*
    * =====================================================
    * EVENTO DO BOTÃO
