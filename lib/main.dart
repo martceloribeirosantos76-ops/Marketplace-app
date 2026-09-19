@@ -23,7 +23,7 @@ class MarketplaceApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Marketplace',
+      title: 'Preço Nexo',
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.blue,
@@ -65,6 +65,8 @@ class _HomePageState extends State<HomePage> {
         loading = false;
       });
     } catch (e) {
+      debugPrint('Erro ao carregar produtos: $e');
+
       setState(() {
         loading = false;
       });
@@ -81,15 +83,9 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Marketplace',
+          'Preço Nexo',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none),
-          ),
-        ],
       ),
       body: currentIndex == 0
           ? Column(
@@ -163,7 +159,7 @@ class _HomePageState extends State<HomePage> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Produtos',
+                      'Ofertas',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -191,7 +187,7 @@ class _HomePageState extends State<HomePage> {
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
-                                childAspectRatio: 0.75,
+                                childAspectRatio: 0.68,
                               ),
                               itemCount: filteredProducts.length,
                               itemBuilder: (context, index) {
@@ -203,15 +199,44 @@ class _HomePageState extends State<HomePage> {
                                 final price =
                                     product['price']?.toString() ?? '0.00';
 
-                                final category =
-                                    product['category_id']?.toString() ?? '';
+                                final imageUrl =
+                                    product['image_url']?.toString() ?? '';
+
+                                final seller =
+                                    product['seller_name']?.toString() ?? '';
+
+                                final discount =
+                                    product['discount_percentage']
+                                            ?.toString() ??
+                                        '';
 
                                 return Card(
                                   clipBehavior: Clip.antiAlias,
+                                  elevation: 2,
                                   child: InkWell(
-                                    onTap: () {},
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) {
+                                          return AlertDialog(
+                                            title: Text(name),
+                                            content: const Text(
+                                              'Produto selecionado.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context);
+                                                },
+                                                child: const Text('Fechar'),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    },
                                     child: Padding(
-                                      padding: const EdgeInsets.all(12),
+                                      padding: const EdgeInsets.all(10),
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
@@ -220,18 +245,44 @@ class _HomePageState extends State<HomePage> {
                                             child: Container(
                                               width: double.infinity,
                                               decoration: BoxDecoration(
-                                                color: Colors.grey.shade200,
+                                                color: Colors.grey.shade100,
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
-                                              child: const Icon(
-                                                Icons.shopping_bag,
-                                                size: 60,
-                                                color: Colors.grey,
-                                              ),
+                                              child: imageUrl.isNotEmpty
+                                                  ? ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        12,
+                                                      ),
+                                                      child: Image.network(
+                                                        imageUrl,
+                                                        fit: BoxFit.contain,
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) {
+                                                          return const Icon(
+                                                            Icons
+                                                                .image_not_supported,
+                                                            size: 50,
+                                                            color: Colors.grey,
+                                                          );
+                                                        },
+                                                      ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.shopping_bag,
+                                                      size: 55,
+                                                      color: Colors.grey,
+                                                    ),
                                             ),
                                           ),
+
                                           const SizedBox(height: 8),
+
                                           Text(
                                             name,
                                             maxLines: 2,
@@ -240,7 +291,9 @@ class _HomePageState extends State<HomePage> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          const SizedBox(height: 5),
+
+                                          const SizedBox(height: 4),
+
                                           Text(
                                             'R\$ $price',
                                             style: const TextStyle(
@@ -248,11 +301,25 @@ class _HomePageState extends State<HomePage> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          if (category.isNotEmpty)
+
+                                          if (discount.isNotEmpty &&
+                                              discount != '0')
                                             Text(
-                                              category,
+                                              '$discount% OFF',
+                                              style: const TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+
+                                          if (seller.isNotEmpty)
+                                            Text(
+                                              seller,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 color: Colors.grey.shade600,
+                                                fontSize: 12,
                                               ),
                                             ),
                                         ],
@@ -267,9 +334,7 @@ class _HomePageState extends State<HomePage> {
             )
           : Center(
               child: Text(
-                currentIndex == 1
-                    ? '❤️ Favoritos'
-                    : '👤 Minha conta',
+                currentIndex == 1 ? '❤️ Favoritos' : '👤 Minha conta',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
