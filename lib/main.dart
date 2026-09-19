@@ -6,7 +6,7 @@ const supabaseUrl = 'https://iwjnkguatgumdcfpytpu.supabase.co';
 // IMPORTANTE:
 // Se você já tinha uma chave anon/public funcionando no main.dart,
 // mantenha a mesma chave que já estava no seu projeto.
-const supabaseAnonKey = sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD
+const supabaseAnonKey = 'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD;.
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
