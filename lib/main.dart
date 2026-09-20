@@ -250,12 +250,19 @@ class _HomePageState extends State<HomePage> {
                                 borderRadius:
                                     BorderRadius.circular(12),
                               ),
-                              child: const Icon(
-                                Icons.shopping_bag_outlined,
-                                size: 52,
-                                color: Colors.blueGrey,
-                              ),
-                            ),
+                              child: Image.network(
+  'https://cf.shopee.com.br/file/73ef3c9d03d6eb4abebcf373da6db535',
+  width: double.infinity,
+  height: 110,
+  fit: BoxFit.contain,
+  errorBuilder: (context, error, stackTrace) {
+    return const Icon(
+      Icons.broken_image_outlined,
+      size: 52,
+      color: Colors.red,
+    );
+  },
+),
 
                             const SizedBox(height: 12),
 
