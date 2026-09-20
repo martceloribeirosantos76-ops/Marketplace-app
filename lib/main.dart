@@ -211,7 +211,7 @@ class _HomePageState extends State<HomePage> {
                   itemCount: produtos.length,
                   itemBuilder: (context, index) {
                     final produto = produtos[index];
-
+                    debugPrint('IMAGE URL: ${produto['image_url']}');
                     final nome =
                         produto['name']?.toString() ??
                         'Produto sem nome';
