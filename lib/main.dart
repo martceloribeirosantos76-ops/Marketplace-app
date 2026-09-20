@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const supabaseUrl = 'https://iwjnkguatgumdcfpytpu.supabase.co';
+const supabaseUrl =
+    'https://iwjnkguatgumdcfpytpu.supabase.co';
 
-// IMPORTANTE:
-// Se você já tinha uma chave anon/public funcionando no main.dart,
-// mantenha a mesma chave que já estava no seu projeto.
-const supabaseAnonKey = 'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD';
+const supabaseAnonKey =
+    'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -67,7 +67,8 @@ class _HomePageState extends State<HomePage> {
           .select(
             'id,name,condition,category_id,seller_name,price,store_name,'
             'is_sponsored,created_at,affiliate_url,external_product_id,'
-            'original_price,affiliate_network,discount_percentage',
+            'original_price,affiliate_network,discount_percentage,'
+            'image_url',
           )
           .order('created_at', ascending: false);
 
@@ -84,7 +85,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   String formatarPreco(dynamic valor) {
-    if (valor == null) return 'Preço não informado';
+    if (valor == null) {
+      return 'Preço não informado';
+    }
 
     final numero = double.tryParse(valor.toString());
 
@@ -99,14 +102,14 @@ class _HomePageState extends State<HomePage> {
     if (url == null || url.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Link da oferta ainda não disponível.'),
+          content: Text(
+            'Link da oferta ainda não disponível.',
+          ),
         ),
       );
       return;
     }
 
-    // O link será conectado à abertura externa
-    // na próxima etapa da monetização.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Oferta: $url'),
@@ -157,7 +160,8 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: Center(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
                     children: [
                       const Icon(
                         Icons.error_outline,
@@ -181,7 +185,9 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: carregarProdutos,
-                        child: const Text('Tentar novamente'),
+                        child: const Text(
+                          'Tentar novamente',
+                        ),
                       ),
                     ],
                   ),
@@ -211,7 +217,7 @@ class _HomePageState extends State<HomePage> {
                   itemCount: produtos.length,
                   itemBuilder: (context, index) {
                     final produto = produtos[index];
-                    debugPrint('IMAGE URL: ${produto['image_url']}');
+
                     final nome =
                         produto['name']?.toString() ??
                         'Produto sem nome';
@@ -221,9 +227,8 @@ class _HomePageState extends State<HomePage> {
                         produto['seller_name']?.toString() ??
                         'Loja não informada';
 
-                    final preco = formatarPreco(
-                      produto['price'],
-                    );
+                    final preco =
+                        formatarPreco(produto['price']);
 
                     final desconto =
                         produto['discount_percentage'];
@@ -251,25 +256,28 @@ class _HomePageState extends State<HomePage> {
                                     BorderRadius.circular(12),
                               ),
                               child: Image.network(
-  'https://cf.shopee.com.br/file/73ef3c9d03d6eb4abebcf373da6db535',
-  width: double.infinity,
-  height: 110,
-  fit: BoxFit.contain,
-  errorBuilder: (context, error, stackTrace) {
-    return const Icon(
-      Icons.broken_image_outlined,
-      size: 52,
-      color: Colors.red,
-    );
-  },
-),
+                                'https://cf.shopee.com.br/file/73ef3c9d03d6eb4abebcf373da6db535',
+                                width: double.infinity,
+                                height: 110,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 52,
+                                    color: Colors.red,
+                                  );
+                                },
+                              ),
+                            ),
 
                             const SizedBox(height: 12),
 
                             Text(
                               nome,
                               maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                              overflow:
+                                  TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -281,57 +289,11 @@ class _HomePageState extends State<HomePage> {
                             Text(
                               loja,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow:
+                                  TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                               ),
                             ),
 
-                            const SizedBox(height: 8),
-
-                            Text(
-                              preco,
-                              style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-
-                            if (desconto != null)
-                              Text(
-                                'Desconto: $desconto%',
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                ),
-                              ),
-
-                            const Spacer(),
-
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  abrirOferta(
-                                    produto['affiliate_url']
-                                        ?.toString(),
-                                  );
-                                },
-                                child: Text(
-                                  'Ver oferta • $rede',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+                            const Sized
