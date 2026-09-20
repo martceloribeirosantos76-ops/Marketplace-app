@@ -148,6 +148,7 @@ class _HomePageState extends State<HomePage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+
             const SizedBox(height: 16),
 
             if (carregando)
@@ -168,12 +169,16 @@ class _HomePageState extends State<HomePage> {
                         size: 48,
                         color: Colors.red,
                       ),
+
                       const SizedBox(height: 12),
+
                       const Text(
                         'Não foi possível carregar os produtos.',
                         textAlign: TextAlign.center,
                       ),
+
                       const SizedBox(height: 8),
+
                       Text(
                         erro!,
                         textAlign: TextAlign.center,
@@ -182,7 +187,9 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.grey,
                         ),
                       ),
+
                       const SizedBox(height: 16),
+
                       ElevatedButton(
                         onPressed: carregarProdutos,
                         child: const Text(
@@ -214,7 +221,9 @@ class _HomePageState extends State<HomePage> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
+
                   itemCount: produtos.length,
+
                   itemBuilder: (context, index) {
                     final produto = produtos[index];
 
@@ -238,6 +247,9 @@ class _HomePageState extends State<HomePage> {
                             ?.toString() ??
                         'Shopee';
 
+                    final imagem =
+                        produto['image_url']?.toString();
+
                     return Card(
                       elevation: 2,
                       clipBehavior: Clip.antiAlias,
@@ -255,20 +267,39 @@ class _HomePageState extends State<HomePage> {
                                 borderRadius:
                                     BorderRadius.circular(12),
                               ),
-                              child: Image.network(
-                                'https://cf.shopee.com.br/file/73ef3c9d03d6eb4abebcf373da6db535',
-                                width: double.infinity,
-                                height: 110,
-                                fit: BoxFit.contain,
-                                errorBuilder:
-                                    (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.broken_image_outlined,
-                                    size: 52,
-                                    color: Colors.red,
-                                  );
-                                },
-                              ),
+                              child:
+                                  imagem != null &&
+                                          imagem.trim().isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: Image.network(
+                                            imagem,
+                                            width: double.infinity,
+                                            height: 110,
+                                            fit: BoxFit.contain,
+                                            errorBuilder:
+                                                (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) {
+                                              return const Icon(
+                                                Icons
+                                                    .broken_image_outlined,
+                                                size: 52,
+                                                color:
+                                                    Colors.blueGrey,
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons
+                                              .shopping_bag_outlined,
+                                          size: 52,
+                                          color: Colors.blueGrey,
+                                        ),
                             ),
 
                             const SizedBox(height: 12),
@@ -296,4 +327,51 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
 
-                            const Sized
+                            const SizedBox(height: 8),
+
+                            Text(
+                              preco,
+                              style: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+
+                            if (desconto != null)
+                              Text(
+                                'Desconto: $desconto%',
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                ),
+                              ),
+
+                            const Spacer(),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  abrirOferta(
+                                    produto['affiliate_url']
+                                        ?.toString(),
+                                  );
+                                },
+                                child: Text(
+                                  'Ver oferta • $rede',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
