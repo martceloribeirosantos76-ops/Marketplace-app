@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const supabaseUrl =
@@ -6,6 +9,9 @@ const supabaseUrl =
 
 const supabaseAnonKey =
     'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD';
+
+const affiliateClickFunctionUrl =
+    '$supabaseUrl/functions/v1/affiliate-click';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -98,22 +104,191 @@ class _HomePageState extends State<HomePage> {
     return 'R\$ ${numero.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
-  Future<void> abrirOferta(String? url) async {
-    if (url == null || url.trim().isEmpty) {
+  Future<void> abrirOferta(
+    Map<String, dynamic> produto,
+  ) async {
+    final productId = produto['id'];
+
+    final affiliateUrl =
+        produto['affiliate_url']?.toString();
+
+    if (productId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Link da oferta ainda não disponível.',
+            'ID do produto não encontrado.',
           ),
         ),
       );
       return;
     }
 
+    final id = int.tryParse(
+      productId.toString(),
+    );
+
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'ID do produto inválido.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    /*
+     * Mostra carregamento enquanto a Edge Function
+     * registra o clique.
+     */
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Oferta: $url'),
+      const SnackBar(
+        content: Text(
+          'Abrindo oferta...',
+        ),
+        duration: Duration(seconds: 2),
       ),
+    );
+
+    try {
+      final uri = Uri.parse(
+        '$affiliateClickFunctionUrl?product_id=$id',
+      );
+
+      /*
+       * Faz a chamada para a Edge Function.
+       *
+       * IMPORTANTE:
+       * Não usamos http.get aqui porque queremos
+       * obter a resposta da função e extrair o
+       * redirecionamento da Shopee.
+       */
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization':
+              'Bearer $supabaseAnonKey',
+          'apikey': supabaseAnonKey,
+        },
+      );
+
+      /*
+       * A Edge Function responde 302 quando tudo
+       * está correto.
+       *
+       * Como o pacote http pode seguir redirects
+       * automaticamente, também verificamos a URL
+       * final.
+       */
+      if (response.statusCode >= 200 &&
+          response.statusCode < 400) {
+        String? destino;
+
+        if (response.headers['location'] != null) {
+          destino = response.headers['location'];
+        }
+
+        /*
+         * Caso a resposta tenha sido transformada
+         * em JSON, tenta obter a URL.
+         */
+        if (destino == null &&
+            response.body.isNotEmpty) {
+          try {
+            final json =
+                jsonDecode(response.body);
+
+            if (json is Map &&
+                json['affiliate_url'] != null) {
+              destino =
+                  json['affiliate_url'].toString();
+            }
+          } catch (_) {
+            // Ignora resposta que não seja JSON.
+          }
+        }
+
+        /*
+         * Fallback para o link que já está salvo
+         * no produto.
+         */
+        destino ??= affiliateUrl;
+
+        if (destino != null &&
+            destino.trim().isNotEmpty) {
+          await _abrirLink(destino);
+          return;
+        }
+      }
+
+      /*
+       * Se a Edge Function respondeu erro,
+       * tenta usar o affiliate_url salvo.
+       */
+      if (affiliateUrl != null &&
+          affiliateUrl.trim().isNotEmpty) {
+        await _abrirLink(affiliateUrl);
+        return;
+      }
+
+      throw Exception(
+        'Não foi possível obter o link da oferta.',
+      );
+    } catch (e) {
+      /*
+       * Fallback:
+       *
+       * Mesmo que a chamada da Edge Function
+       * apresente algum problema no Flutter,
+       * tentamos abrir o link já salvo.
+       */
+      if (affiliateUrl != null &&
+          affiliateUrl.trim().isNotEmpty) {
+        await _abrirLink(affiliateUrl);
+        return;
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Erro ao abrir a oferta: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _abrirLink(String url) async {
+    /*
+     * Por enquanto mostramos o link.
+     *
+     * Na próxima etapa podemos colocar
+     * url_launcher para abrir diretamente
+     * no navegador/app da Shopee.
+     */
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Oferta encontrada',
+          ),
+          content: SelectableText(url),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -139,7 +314,8 @@ class _HomePageState extends State<HomePage> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             const Text(
               'Categorias',
@@ -174,15 +350,18 @@ class _HomePageState extends State<HomePage> {
 
                       const Text(
                         'Não foi possível carregar os produtos.',
-                        textAlign: TextAlign.center,
+                        textAlign:
+                            TextAlign.center,
                       ),
 
                       const SizedBox(height: 8),
 
                       Text(
                         erro!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        textAlign:
+                            TextAlign.center,
+                        style:
+                            const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),
@@ -191,7 +370,8 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 16),
 
                       ElevatedButton(
-                        onPressed: carregarProdutos,
+                        onPressed:
+                            carregarProdutos,
                         child: const Text(
                           'Tentar novamente',
                         ),
@@ -221,140 +401,189 @@ class _HomePageState extends State<HomePage> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
-
                   itemCount: produtos.length,
-
-                  itemBuilder: (context, index) {
-                    final produto = produtos[index];
+                  itemBuilder:
+                      (context, index) {
+                    final produto =
+                        produtos[index];
 
                     final nome =
-                        produto['name']?.toString() ??
-                        'Produto sem nome';
+                        produto['name']
+                                ?.toString() ??
+                            'Produto sem nome';
 
                     final loja =
-                        produto['store_name']?.toString() ??
-                        produto['seller_name']?.toString() ??
-                        'Loja não informada';
+                        produto['store_name']
+                                ?.toString() ??
+                            produto['seller_name']
+                                ?.toString() ??
+                            'Loja não informada';
 
                     final preco =
-                        formatarPreco(produto['price']);
+                        formatarPreco(
+                      produto['price'],
+                    );
 
                     final desconto =
-                        produto['discount_percentage'];
+                        produto[
+                            'discount_percentage'];
 
                     final rede =
-                        produto['affiliate_network']
-                            ?.toString() ??
-                        'Shopee';
+                        produto[
+                                    'affiliate_network']
+                                ?.toString() ??
+                            'Shopee';
 
                     final imagem =
-                        produto['image_url']?.toString();
+                        produto['image_url']
+                            ?.toString();
 
                     return Card(
                       elevation: 2,
-                      clipBehavior: Clip.antiAlias,
+                      clipBehavior:
+                          Clip.antiAlias,
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding:
+                            const EdgeInsets.all(
+                          16,
+                        ),
                         child: Column(
                           crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                              CrossAxisAlignment
+                                  .start,
                           children: [
                             Container(
                               height: 110,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
+                              width:
+                                  double.infinity,
+                              decoration:
+                                  BoxDecoration(
+                                color: Colors
+                                    .grey.shade100,
                                 borderRadius:
-                                    BorderRadius.circular(12),
+                                    BorderRadius
+                                        .circular(
+                                  12,
+                                ),
                               ),
-                              child:
-                                  imagem != null &&
-                                          imagem.trim().isNotEmpty
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: Image.network(
-                                            imagem,
-                                            width: double.infinity,
-                                            height: 110,
-                                            fit: BoxFit.contain,
-                                            errorBuilder:
-                                                (
-                                                  context,
-                                                  error,
-                                                  stackTrace,
-                                                ) {
-                                              return const Icon(
-                                                Icons
-                                                    .broken_image_outlined,
-                                                size: 52,
-                                                color:
-                                                    Colors.blueGrey,
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons
-                                              .shopping_bag_outlined,
-                                          size: 52,
-                                          color: Colors.blueGrey,
-                                        ),
+                              child: imagem !=
+                                          null &&
+                                      imagem
+                                          .trim()
+                                          .isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        12,
+                                      ),
+                                      child:
+                                          Image.network(
+                                        imagem,
+                                        width:
+                                            double
+                                                .infinity,
+                                        height: 110,
+                                        fit: BoxFit
+                                            .contain,
+                                        errorBuilder:
+                                            (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) {
+                                          return const Icon(
+                                            Icons
+                                                .broken_image_outlined,
+                                            size:
+                                                52,
+                                            color: Colors
+                                                .blueGrey,
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons
+                                          .shopping_bag_outlined,
+                                      size: 52,
+                                      color: Colors
+                                          .blueGrey,
+                                    ),
                             ),
 
-                            const SizedBox(height: 12),
+                            const SizedBox(
+                              height: 12,
+                            ),
 
                             Text(
                               nome,
                               maxLines: 3,
                               overflow:
-                                  TextOverflow.ellipsis,
-                              style: const TextStyle(
+                                  TextOverflow
+                                      .ellipsis,
+                              style:
+                                  const TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
                               ),
                             ),
 
-                            const SizedBox(height: 8),
+                            const SizedBox(
+                              height: 8,
+                            ),
 
                             Text(
                               loja,
                               maxLines: 1,
                               overflow:
-                                  TextOverflow.ellipsis,
+                                  TextOverflow
+                                      .ellipsis,
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: Colors
+                                    .grey.shade700,
                               ),
                             ),
 
-                            const SizedBox(height: 8),
+                            const SizedBox(
+                              height: 8,
+                            ),
 
                             Text(
                               preco,
-                              style: const TextStyle(
+                              style:
+                                  const TextStyle(
                                 fontSize: 21,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                                color:
+                                    Colors.green,
                               ),
                             ),
 
                             if (desconto != null)
                               Text(
                                 'Desconto: $desconto%',
-                                style: const TextStyle(
-                                  color: Colors.red,
+                                style:
+                                    const TextStyle(
+                                  color:
+                                      Colors.red,
                                 ),
                               ),
 
                             const Spacer(),
 
                             SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
+                              width:
+                                  double.infinity,
+                              child:
+                                  ElevatedButton(
                                 onPressed: () {
                                   abrirOferta(
-                                    produto['affiliate_url']
-                                        ?.toString(),
+                                    produto,
                                   );
                                 },
                                 child: Text(
