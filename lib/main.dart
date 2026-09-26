@@ -5,8 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const supabaseUrl =
-    'https://iwjnkguatgumdcfpytpu.supabase.co';
+const supabaseUrl = 'https://iwjnkguatgumdcfpytpu.supabase.co';
 
 const supabaseAnonKey =
     'sb_publishable__P3S6gs7rhb-YmQlzzCG5w_KbbtpKXD';
@@ -54,7 +53,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool carregando = true;
   String? erro;
+
   List<Map<String, dynamic>> produtos = [];
+
   String busca = '';
   int? categoriaSelecionada;
 
@@ -79,23 +80,45 @@ class _HomePageState extends State<HomePage> {
     18: 'Outros',
   };
 
+  List<MapEntry<int, String>> get categoriasDisponiveis {
+    final ids = produtos
+        .map(
+          (produto) => int.tryParse(
+            produto['category_id']?.toString() ?? '',
+          ),
+        )
+        .whereType<int>()
+        .toSet();
+
+    return categorias.entries
+        .where((categoria) => ids.contains(categoria.key))
+        .toList();
+  }
+
   List<Map<String, dynamic>> get produtosFiltrados {
     final termo = busca.trim().toLowerCase();
 
     return produtos.where((produto) {
       final nome =
           produto['name']?.toString().toLowerCase() ?? '';
+
       final loja =
-          produto['store_name']?.toString().toLowerCase() ?? '';
+          produto['store_name']?.toString().toLowerCase() ??
+              produto['seller_name']?.toString().toLowerCase() ??
+              '';
 
       final correspondeBusca =
           termo.isEmpty ||
           nome.contains(termo) ||
           loja.contains(termo);
 
+      final categoriaProduto = int.tryParse(
+        produto['category_id']?.toString() ?? '',
+      );
+
       final correspondeCategoria =
           categoriaSelecionada == null ||
-          produto['category_id'] == categoriaSelecionada;
+          categoriaProduto == categoriaSelecionada;
 
       return correspondeBusca && correspondeCategoria;
     }).toList();
@@ -124,11 +147,23 @@ class _HomePageState extends State<HomePage> {
           )
           .order('created_at', ascending: false);
 
+      if (!mounted) return;
+
       setState(() {
         produtos = List<Map<String, dynamic>>.from(resposta);
         carregando = false;
+
+        if (categoriaSelecionada != null &&
+            !categoriasDisponiveis.any(
+              (categoria) =>
+                  categoria.key == categoriaSelecionada,
+            )) {
+          categoriaSelecionada = null;
+        }
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         carregando = false;
         erro = e.toString();
@@ -158,30 +193,20 @@ class _HomePageState extends State<HomePage> {
         produto['affiliate_url']?.toString();
 
     if (productId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ID do produto não encontrado.'),
-        ),
-      );
+      _mostrarMensagem('ID do produto não encontrado.');
       return;
     }
 
     final id = int.tryParse(productId.toString());
 
     if (id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ID do produto inválido.'),
-        ),
-      );
+      _mostrarMensagem('ID do produto inválido.');
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Abrindo oferta...'),
-        duration: Duration(seconds: 2),
-      ),
+    _mostrarMensagem(
+      'Abrindo oferta...',
+      duracao: const Duration(seconds: 2),
     );
 
     try {
@@ -210,15 +235,13 @@ class _HomePageState extends State<HomePage> {
         destino = response.headers['location'];
       }
 
-      if (destino == null &&
-          response.body.isNotEmpty) {
+      if (destino == null && response.body.isNotEmpty) {
         try {
           final json = jsonDecode(response.body);
 
           if (json is Map &&
               json['affiliate_url'] != null) {
-            destino =
-                json['affiliate_url'].toString();
+            destino = json['affiliate_url'].toString();
           }
         } catch (_) {
           // Resposta não é JSON.
@@ -231,8 +254,7 @@ class _HomePageState extends State<HomePage> {
         destino = affiliateUrl;
       }
 
-      if (destino != null &&
-          destino.trim().isNotEmpty) {
+      if (destino != null && destino.trim().isNotEmpty) {
         await _abrirLink(destino);
         return;
       }
@@ -247,14 +269,8 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Erro ao abrir a oferta: $e',
-          ),
-        ),
+      _mostrarMensagem(
+        'Erro ao abrir a oferta: $e',
       );
     }
   }
@@ -263,14 +279,7 @@ class _HomePageState extends State<HomePage> {
     final uri = Uri.tryParse(url);
 
     if (uri == null) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Link da oferta inválido.'),
-        ),
-      );
-
+      _mostrarMensagem('Link da oferta inválido.');
       return;
     }
 
@@ -279,19 +288,31 @@ class _HomePageState extends State<HomePage> {
       mode: LaunchMode.externalApplication,
     );
 
-    if (!abriu && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Não foi possível abrir a oferta.',
-          ),
-        ),
+    if (!abriu) {
+      _mostrarMensagem(
+        'Não foi possível abrir a oferta.',
       );
     }
   }
 
+  void _mostrarMensagem(
+    String mensagem, {
+    Duration duracao = const Duration(seconds: 3),
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensagem),
+        duration: duracao,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final produtosExibidos = produtosFiltrados;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -312,8 +333,7 @@ class _HomePageState extends State<HomePage> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Preço Nexo',
@@ -322,9 +342,7 @@ class _HomePageState extends State<HomePage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               decoration: InputDecoration(
                 hintText: 'Buscar produtos',
@@ -349,58 +367,56 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
-
-            const SizedBox(height: 12),
-
-            const Text(
-              'Categorias',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            const SizedBox(height: 16),
+            if (categoriasDisponiveis.isNotEmpty) ...[
+              const Text(
+                'Categorias',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-
-            const SizedBox(height: 8),
-
-            SizedBox(
-              height: 42,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: const Text('Todas'),
-                      selected: categoriaSelecionada == null,
-                      onSelected: (_) {
-                        setState(() {
-                          categoriaSelecionada = null;
-                        });
-                      },
-                    ),
-                  ),
-                  ...categorias.entries.map(
-                    (categoria) => Padding(
-                      padding:
-                          const EdgeInsets.only(right: 8),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 42,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        label: Text(categoria.value),
+                        label: const Text('Todas'),
                         selected:
-                            categoriaSelecionada ==
-                                categoria.key,
+                            categoriaSelecionada == null,
                         onSelected: (_) {
                           setState(() {
-                            categoriaSelecionada =
-                                categoria.key;
+                            categoriaSelecionada = null;
                           });
                         },
                       ),
                     ),
-                  ),
-                ],
+                    ...categoriasDisponiveis.map(
+                      (categoria) => Padding(
+                        padding:
+                            const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(categoria.value),
+                          selected:
+                              categoriaSelecionada ==
+                                  categoria.key,
+                          onSelected: (_) {
+                            setState(() {
+                              categoriaSelecionada =
+                                  categoria.key;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-
+            ],
             const SizedBox(height: 12),
             if (carregando)
               const Expanded(
@@ -456,13 +472,15 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
-            else if (produtosFiltrados.isEmpty)
+            else if (produtosExibidos.isEmpty)
               const Expanded(
                 child: Center(
                   child: Text(
                     'Nenhum produto encontrado para este filtro.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18),
+                    style: TextStyle(
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               )
@@ -476,19 +494,18 @@ class _HomePageState extends State<HomePage> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
-                  itemCount: produtosFiltrados.length,
+                  itemCount: produtosExibidos.length,
                   itemBuilder: (context, index) {
-                    final produto = produtosFiltrados[index];
+                    final produto =
+                        produtosExibidos[index];
 
                     final nome =
                         produto['name']?.toString() ??
                             'Produto sem nome';
 
                     final loja =
-                        produto['store_name']
-                                ?.toString() ??
-                            produto['seller_name']
-                                ?.toString() ??
+                        produto['store_name']?.toString() ??
+                            produto['seller_name']?.toString() ??
                             'Loja não informada';
 
                     final preco =
@@ -518,52 +535,51 @@ class _HomePageState extends State<HomePage> {
                             Container(
                               height: 110,
                               width: double.infinity,
-                              decoration:
-                                  BoxDecoration(
+                              decoration: BoxDecoration(
                                 color:
                                     Colors.grey.shade100,
                                 borderRadius:
-                                    BorderRadius.circular(
-                                  12,
-                                ),
+                                    BorderRadius.circular(12),
                               ),
-                              child: imagem != null &&
-                                      imagem.trim().isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                        12,
-                                      ),
-                                      child:
-                                          Image.network(
-                                        imagem,
-                                        width:
-                                            double.infinity,
-                                        height: 110,
-                                        fit: BoxFit.contain,
-                                        errorBuilder:
-                                            (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
-                                          return const Icon(
-                                            Icons
-                                                .broken_image_outlined,
-                                            size: 52,
-                                            color:
-                                                Colors.blueGrey,
-                                          );
-                                        },
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons
-                                          .shopping_bag_outlined,
-                                      size: 52,
-                                      color:
-                                          Colors.blueGrey,
-                                    ),
+                              child:
+                                  imagem != null &&
+                                          imagem
+                                              .trim()
+                                              .isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius:
+                                              BorderRadius
+                                                  .circular(12),
+                                          child:
+                                              Image.network(
+                                            imagem,
+                                            width:
+                                                double.infinity,
+                                            height: 110,
+                                            fit: BoxFit.contain,
+                                            errorBuilder:
+                                                (
+                                              context,
+                                              error,
+                                              stackTrace,
+                                            ) {
+                                              return const Icon(
+                                                Icons
+                                                    .broken_image_outlined,
+                                                size: 52,
+                                                color:
+                                                    Colors.blueGrey,
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons
+                                              .shopping_bag_outlined,
+                                          size: 52,
+                                          color:
+                                              Colors.blueGrey,
+                                        ),
                             ),
                             const SizedBox(height: 12),
                             Text(
