@@ -55,6 +55,51 @@ class _HomePageState extends State<HomePage> {
   bool carregando = true;
   String? erro;
   List<Map<String, dynamic>> produtos = [];
+  String busca = '';
+  int? categoriaSelecionada;
+
+  final Map<int, String> categorias = {
+    1: 'Eletrônicos',
+    2: 'Informática',
+    3: 'Celulares e Acessórios',
+    4: 'Casa',
+    5: 'Eletrodomésticos',
+    6: 'Moda',
+    7: 'Beleza',
+    8: 'Esportes e Lazer',
+    9: 'Automotivo',
+    10: 'Ferramentas',
+    11: 'Brinquedos',
+    12: 'Games',
+    13: 'Pet',
+    14: 'Saúde',
+    15: 'Bebês e Crianças',
+    16: 'Livros e Papelaria',
+    17: 'Acessórios',
+    18: 'Outros',
+  };
+
+  List<Map<String, dynamic>> get produtosFiltrados {
+    final termo = busca.trim().toLowerCase();
+
+    return produtos.where((produto) {
+      final nome =
+          produto['name']?.toString().toLowerCase() ?? '';
+      final loja =
+          produto['store_name']?.toString().toLowerCase() ?? '';
+
+      final correspondeBusca =
+          termo.isEmpty ||
+          nome.contains(termo) ||
+          loja.contains(termo);
+
+      final correspondeCategoria =
+          categoriaSelecionada == null ||
+          produto['category_id'] == categoriaSelecionada;
+
+      return correspondeBusca && correspondeCategoria;
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -271,13 +316,92 @@ class _HomePageState extends State<HomePage> {
               CrossAxisAlignment.start,
           children: [
             const Text(
-              'Categorias',
+              'Preço Nexo',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Buscar produtos',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: busca.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            busca = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (valor) {
+                setState(() {
+                  busca = valor;
+                });
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              'Categorias',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            SizedBox(
+              height: 42,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: const Text('Todas'),
+                      selected: categoriaSelecionada == null,
+                      onSelected: (_) {
+                        setState(() {
+                          categoriaSelecionada = null;
+                        });
+                      },
+                    ),
+                  ),
+                  ...categorias.entries.map(
+                    (categoria) => Padding(
+                      padding:
+                          const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(categoria.value),
+                        selected:
+                            categoriaSelecionada ==
+                                categoria.key,
+                        onSelected: (_) {
+                          setState(() {
+                            categoriaSelecionada =
+                                categoria.key;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
             if (carregando)
               const Expanded(
                 child: Center(
@@ -332,6 +456,16 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
+            else if (produtosFiltrados.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    'Nenhum produto encontrado para este filtro.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ),
+              )
             else
               Expanded(
                 child: GridView.builder(
@@ -342,9 +476,9 @@ class _HomePageState extends State<HomePage> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
-                  itemCount: produtos.length,
+                  itemCount: produtosFiltrados.length,
                   itemBuilder: (context, index) {
-                    final produto = produtos[index];
+                    final produto = produtosFiltrados[index];
 
                     final nome =
                         produto['name']?.toString() ??
