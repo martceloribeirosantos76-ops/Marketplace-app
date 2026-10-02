@@ -139,35 +139,56 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final resposta = await Supabase.instance.client
-          .from('products')
-          .select(
-            'id,'
-            'name,'
-            'condition,'
-            'category_id,'
-            'seller_name,'
-            'price,'
-            'store_name,'
-            'is_sponsored,'
-            'created_at,'
-            'affiliate_url,'
-            'external_product_id,'
-            'original_price,'
-            'affiliate_network,'
-            'discount_percentage,'
-            'image_url,'
-            'stock',
-          )
-          .order('created_at', ascending: false);
+      final client = Supabase.instance.client;
 
-      final lista =
-          List<Map<String, dynamic>>.from(resposta);
+      const campos =
+          'id,'
+          'name,'
+          'condition,'
+          'category_id,'
+          'seller_name,'
+          'price,'
+          'store_name,'
+          'is_sponsored,'
+          'created_at,'
+          'affiliate_url,'
+          'external_product_id,'
+          'original_price,'
+          'affiliate_network,'
+          'discount_percentage,'
+          'image_url,'
+          'stock';
+
+      final List<Map<String, dynamic>> todosProdutos = [];
+
+      const tamanhoPagina = 50;
+      int inicio = 0;
+
+      while (true) {
+        final fim = inicio + tamanhoPagina - 1;
+
+        final resposta = await client
+            .from('products')
+            .select(campos)
+            .order('created_at', ascending: false)
+            .range(inicio, fim);
+
+        final pagina =
+            List<Map<String, dynamic>>.from(resposta);
+
+        todosProdutos.addAll(pagina);
+
+        if (pagina.length < tamanhoPagina) {
+          break;
+        }
+
+        inicio += tamanhoPagina;
+      }
 
       if (!mounted) return;
 
       setState(() {
-        produtos = lista;
+        produtos = todosProdutos;
         carregando = false;
       });
     } catch (e) {
@@ -232,6 +253,7 @@ class _HomePageState extends State<HomePage> {
     Map<String, dynamic> produto,
   ) async {
     final productId = produto['id'];
+
     final affiliateUrl =
         produto['affiliate_url']?.toString().trim();
 
@@ -294,10 +316,7 @@ class _HomePageState extends State<HomePage> {
           }
         } catch (_) {}
       }
-    } catch (_) {
-      // Se a Edge Function falhar,
-      // usamos o affiliate_url abaixo.
-    }
+    } catch (_) {}
 
     if (destino == null || destino.trim().isEmpty) {
       destino = affiliateUrl;
@@ -333,7 +352,7 @@ class _HomePageState extends State<HomePage> {
           'Não foi possível abrir a oferta.',
         );
       }
-    } catch (e) {
+    } catch (_) {
       _mostrarMensagem(
         'Erro ao abrir a oferta.',
       );
@@ -367,14 +386,17 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final url = imagem.trim();
+
     return Container(
       color: Colors.grey.shade100,
       alignment: Alignment.center,
       child: Image.network(
-        imagem.trim(),
+        url,
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.contain,
+        cacheWidth: 700,
         loadingBuilder: (
           context,
           child,
@@ -424,16 +446,17 @@ class _HomePageState extends State<HomePage> {
         produto['name']?.toString() ??
             'Produto sem nome';
 
+    final storeName =
+        produto['store_name']?.toString().trim();
+
+    final sellerName =
+        produto['seller_name']?.toString().trim();
+
     final loja =
-        produto['store_name']?.toString().trim().isNotEmpty ==
-                true
-            ? produto['store_name'].toString()
-            : produto['seller_name']
-                    ?.toString()
-                    .trim()
-                    .isNotEmpty ==
-                true
-                ? produto['seller_name'].toString()
+        storeName != null && storeName.isNotEmpty
+            ? storeName
+            : sellerName != null && sellerName.isNotEmpty
+                ? sellerName
                 : 'Loja não informada';
 
     final preco = formatarPreco(produto['price']);
@@ -443,10 +466,14 @@ class _HomePageState extends State<HomePage> {
 
     final rede = nomeRede(produto);
 
-    final imagem = produto['image_url']?.toString();
+    final imagem =
+        produto['image_url']?.toString().trim();
 
     final temAfiliado =
-        produto['affiliate_url']?.toString().trim().isNotEmpty ==
+        produto['affiliate_url']
+                ?.toString()
+                .trim()
+                .isNotEmpty ==
             true;
 
     final patrocinado =
@@ -456,7 +483,8 @@ class _HomePageState extends State<HomePage> {
       elevation: 2,
       clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           SizedBox(
             height: 190,
@@ -493,7 +521,8 @@ class _HomePageState extends State<HomePage> {
                             'Patrocinado',
                             style: TextStyle(
                               fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                              fontWeight:
+                                  FontWeight.bold,
                             ),
                           ),
                         ),
@@ -514,8 +543,10 @@ class _HomePageState extends State<HomePage> {
                           rede,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: corRede(produto),
+                            fontWeight:
+                                FontWeight.bold,
+                            color:
+                                corRede(produto),
                           ),
                         ),
                       ),
@@ -525,20 +556,24 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     nome,
                     maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    overflow:
+                        TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                          FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     loja,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow:
+                        TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color:
+                          Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -546,7 +581,8 @@ class _HomePageState extends State<HomePage> {
                     preco,
                     style: const TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                          FontWeight.bold,
                       color: Colors.green,
                     ),
                   ),
@@ -555,15 +591,18 @@ class _HomePageState extends State<HomePage> {
                       'Desconto: $desconto%',
                       style: const TextStyle(
                         color: Colors.red,
-                        fontWeight: FontWeight.w600,
+                        fontWeight:
+                            FontWeight.w600,
                       ),
                     ),
                   const Spacer(),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
+                    child:
+                        ElevatedButton.icon(
                       onPressed: temAfiliado
-                          ? () => abrirOferta(produto)
+                          ? () =>
+                              abrirOferta(produto)
                           : null,
                       icon: const Icon(
                         Icons.open_in_new,
@@ -587,7 +626,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final produtosExibidos = produtosFiltrados;
+    final produtosExibidos =
+        produtosFiltrados;
 
     return Scaffold(
       appBar: AppBar(
@@ -608,7 +648,8 @@ class _HomePageState extends State<HomePage> {
       body: RefreshIndicator(
         onRefresh: carregarProdutos,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding:
+              const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment:
                 CrossAxisAlignment.start,
@@ -617,36 +658,46 @@ class _HomePageState extends State<HomePage> {
                 'Encontre ofertas',
                 style: TextStyle(
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                      FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '${produtos.length} produtos disponíveis',
                 style: TextStyle(
-                  color: Colors.grey.shade700,
+                  color:
+                      Colors.grey.shade700,
                 ),
               ),
               const SizedBox(height: 14),
               TextField(
-                decoration: InputDecoration(
-                  hintText: 'Buscar produtos ou lojas',
+                decoration:
+                    InputDecoration(
+                  hintText:
+                      'Buscar produtos ou lojas',
                   prefixIcon:
                       const Icon(Icons.search),
-                  suffixIcon: busca.isNotEmpty
-                      ? IconButton(
-                          icon:
-                              const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              busca = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
+                  suffixIcon:
+                      busca.isNotEmpty
+                          ? IconButton(
+                              icon:
+                                  const Icon(
+                                Icons.clear,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  busca = '';
+                                });
+                              },
+                            )
+                          : null,
+                  border:
+                      OutlineInputBorder(
                     borderRadius:
-                        BorderRadius.circular(12),
+                        BorderRadius.circular(
+                      12,
+                    ),
                   ),
                 ),
                 onChanged: (valor) {
@@ -656,7 +707,8 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
               const SizedBox(height: 14),
-              if (categoriasDisponiveis.isNotEmpty)
+              if (categoriasDisponiveis
+                  .isNotEmpty)
                 SizedBox(
                   height: 42,
                   child: ListView(
@@ -670,7 +722,9 @@ class _HomePageState extends State<HomePage> {
                         ),
                         child: ChoiceChip(
                           label:
-                              const Text('Todas'),
+                              const Text(
+                            'Todas',
+                          ),
                           selected:
                               categoriaSelecionada ==
                                   null,
@@ -682,22 +736,28 @@ class _HomePageState extends State<HomePage> {
                           },
                         ),
                       ),
-                      ...categoriasDisponiveis.map(
-                        (categoria) => Padding(
+                      ...categoriasDisponiveis
+                          .map(
+                        (categoria) =>
+                            Padding(
                           padding:
-                              const EdgeInsets.only(
+                              const EdgeInsets
+                                  .only(
                             right: 8,
                           ),
                           child: ChoiceChip(
-                            label:
-                                Text(categoria.value),
+                            label: Text(
+                              categoria.value,
+                            ),
                             selected:
                                 categoriaSelecionada ==
-                                    categoria.key,
+                                    categoria
+                                        .key,
                             onSelected: (_) {
                               setState(() {
                                 categoriaSelecionada =
-                                    categoria.key;
+                                    categoria
+                                        .key;
                               });
                             },
                           ),
@@ -708,7 +768,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               const SizedBox(height: 12),
               Expanded(
-                child: _conteudoProdutos(
+                child:
+                    _conteudoProdutos(
                   produtosExibidos,
                 ),
               ),
@@ -720,17 +781,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _conteudoProdutos(
-    List<Map<String, dynamic>> produtosExibidos,
+    List<Map<String, dynamic>>
+        produtosExibidos,
   ) {
     if (carregando) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child:
+            CircularProgressIndicator(),
       );
     }
 
     if (erro != null) {
       return Center(
-        child: SingleChildScrollView(
+        child:
+            SingleChildScrollView(
           child: Column(
             mainAxisAlignment:
                 MainAxisAlignment.center,
@@ -743,15 +807,18 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               const Text(
                 'Não foi possível carregar os produtos.',
-                textAlign: TextAlign.center,
+                textAlign:
+                    TextAlign.center,
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                      FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 erro!,
-                textAlign: TextAlign.center,
+                textAlign:
+                    TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12,
                   color: Colors.grey,
@@ -759,9 +826,11 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: carregarProdutos,
-                child:
-                    const Text('Tentar novamente'),
+                onPressed:
+                    carregarProdutos,
+                child: const Text(
+                  'Tentar novamente',
+                ),
               ),
             ],
           ),
@@ -773,7 +842,8 @@ class _HomePageState extends State<HomePage> {
       return const Center(
         child: Text(
           'Nenhum produto encontrado.',
-          style: TextStyle(fontSize: 18),
+          style:
+              TextStyle(fontSize: 18),
         ),
       );
     }
@@ -782,14 +852,19 @@ class _HomePageState extends State<HomePage> {
       return const Center(
         child: Text(
           'Nenhum produto encontrado para este filtro.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18),
+          textAlign:
+              TextAlign.center,
+          style:
+              TextStyle(fontSize: 18),
         ),
       );
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding:
+          const EdgeInsets.only(
+        bottom: 20,
+      ),
       gridDelegate:
           const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 360,
@@ -797,8 +872,10 @@ class _HomePageState extends State<HomePage> {
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: produtosExibidos.length,
-      itemBuilder: (context, index) {
+      itemCount:
+          produtosExibidos.length,
+      itemBuilder:
+          (context, index) {
         return _produtoCard(
           context,
           produtosExibidos[index],
