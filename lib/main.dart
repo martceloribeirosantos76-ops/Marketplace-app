@@ -132,26 +132,30 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> carregarProdutos() async {
     try {
-      setState(() {
-        carregando = true;
-        erro = null;
-      });
+      if (mounted) {
+        setState(() {
+          carregando = true;
+          erro = null;
+        });
+      }
 
       final resposta = await Supabase.instance.client
           .from('products')
           .select(
-            'id,name,condition,category_id,seller_name,price,store_name,'
-            'is_sponsored,created_at,affiliate_url,external_product_id,'
-            'original_price,affiliate_network,discount_percentage,'
-            'image_url,stock',
+            'id,name,condition,category_id,seller_name,price,'
+            'store_name,is_sponsored,created_at,affiliate_url,'
+            'external_product_id,original_price,affiliate_network,'
+            'discount_percentage,image_url,stock,currency',
           )
-          .gt('stock', 0)
           .order('created_at', ascending: false);
+
+      final lista =
+          List<Map<String, dynamic>>.from(resposta);
 
       if (!mounted) return;
 
       setState(() {
-        produtos = List<Map<String, dynamic>>.from(resposta);
+        produtos = lista;
         carregando = false;
 
         if (categoriaSelecionada != null &&
@@ -186,10 +190,29 @@ class _HomePageState extends State<HomePage> {
     return 'R\$ ${numero.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
+  String nomeRede(Map<String, dynamic> produto) {
+    final rede =
+        produto['affiliate_network']?.toString().toLowerCase();
+
+    if (rede == 'awin') {
+      return 'Awin';
+    }
+
+    if (rede == 'shopee') {
+      return 'Shopee';
+    }
+
+    return rede?.isNotEmpty == true
+        ? rede!.toUpperCase()
+        : 'Afiliado';
+  }
+
   Future<void> abrirOferta(
     Map<String, dynamic> produto,
   ) async {
     final productId = produto['id'];
+    final affiliateUrl =
+        produto['affiliate_url']?.toString();
 
     if (productId == null) {
       _mostrarMensagem('ID do produto não encontrado.');
@@ -202,11 +225,6 @@ class _HomePageState extends State<HomePage> {
       _mostrarMensagem('ID do produto inválido.');
       return;
     }
-
-    _mostrarMensagem(
-      'Abrindo oferta...',
-      duracao: const Duration(seconds: 2),
-    );
 
     try {
       final uri = Uri.parse(
@@ -240,30 +258,36 @@ class _HomePageState extends State<HomePage> {
 
           if (json is Map &&
               json['affiliate_url'] != null) {
-            destino = json['affiliate_url'].toString();
+            destino =
+                json['affiliate_url'].toString();
           }
-        } catch (_) {
-          // Resposta não é JSON.
-        }
+        } catch (_) {}
       }
 
-      if (destino == null) {
-        throw Exception(
-          'A função de afiliados não retornou o destino da oferta.',
-        );
+      if (destino == null &&
+          affiliateUrl != null &&
+          affiliateUrl.trim().isNotEmpty) {
+        destino = affiliateUrl;
       }
 
-      if (destino.trim().isNotEmpty) {
+      if (destino != null &&
+          destino.trim().isNotEmpty) {
         await _abrirLink(destino);
         return;
       }
 
       throw Exception(
-        'O link da oferta está vazio.',
+        'Não foi possível obter o link da oferta.',
       );
-    } catch (e) {
+    } catch (_) {
+      if (affiliateUrl != null &&
+          affiliateUrl.trim().isNotEmpty) {
+        await _abrirLink(affiliateUrl);
+        return;
+      }
+
       _mostrarMensagem(
-        'Não foi possível abrir a oferta. Tente novamente.',
+        'Não foi possível abrir esta oferta.',
       );
     }
   }
@@ -290,7 +314,8 @@ class _HomePageState extends State<HomePage> {
 
   void _mostrarMensagem(
     String mensagem, {
-    Duration duracao = const Duration(seconds: 3),
+    Duration duracao =
+        const Duration(seconds: 3),
   }) {
     if (!mounted) return;
 
@@ -302,9 +327,156 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget construirImagem(String? imagem) {
+    if (imagem == null || imagem.trim().isEmpty) {
+      return Container(
+        color: Colors.grey.shade100,
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.shopping_bag_outlined,
+          size: 56,
+          color: Colors.blueGrey,
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.grey.shade100,
+      alignment: Alignment.center,
+      child: Image.network(
+        imagem,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        loadingBuilder:
+            (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+        errorBuilder:
+            (context, error, stackTrace) {
+          return const Icon(
+            Icons.image_not_supported_outlined,
+            size: 56,
+            color: Colors.blueGrey,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget construirCard(
+    Map<String, dynamic> produto,
+  ) {
+    final nome =
+        produto['name']?.toString() ??
+            'Produto sem nome';
+
+    final loja =
+        produto['store_name']?.toString() ??
+            produto['seller_name']?.toString() ??
+            'Loja não informada';
+
+    final preco =
+        formatarPreco(produto['price']);
+
+    final desconto =
+        produto['discount_percentage'];
+
+    final imagem =
+        produto['image_url']?.toString();
+
+    final rede = nomeRede(produto);
+
+    return Card(
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 180,
+            width: double.infinity,
+            child: construirImagem(imagem),
+          ),
+          Expanded(
+            child: Padding(
+              padding:
+                  const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    nome,
+                    maxLines: 3,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    loja,
+                    maxLines: 1,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color:
+                          Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    preco,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight:
+                          FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  if (desconto != null)
+                    Text(
+                      'Desconto: $desconto%',
+                      style:
+                          const TextStyle(
+                        color: Colors.red,
+                      ),
+                    ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          abrirOferta(produto),
+                      child: Text(
+                        'Ver oferta • $rede',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final produtosExibidos = produtosFiltrados;
+    final produtosExibidos =
+        produtosFiltrados;
 
     return Scaffold(
       appBar: AppBar(
@@ -314,7 +486,6 @@ class _HomePageState extends State<HomePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: false,
         actions: [
           IconButton(
             onPressed: carregarProdutos,
@@ -326,32 +497,48 @@ class _HomePageState extends State<HomePage> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             const Text(
-              'Preço Nexo',
+              'Encontre ofertas',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              '${produtos.length} produtos disponíveis',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 14),
             TextField(
               decoration: InputDecoration(
-                hintText: 'Buscar produtos',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: busca.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            busca = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                hintText:
+                    'Buscar produtos ou lojas',
+                prefixIcon:
+                    const Icon(Icons.search),
+                suffixIcon:
+                    busca.isNotEmpty
+                        ? IconButton(
+                            icon:
+                                const Icon(
+                              Icons.clear,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                busca = '';
+                              });
+                            },
+                          )
+                        : null,
+                border:
+                    OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(12),
                 ),
               ),
               onChanged: (valor) {
@@ -360,40 +547,46 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
-            const SizedBox(height: 16),
-            if (categoriasDisponiveis.isNotEmpty) ...[
-              const Text(
-                'Categorias',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            if (categoriasDisponiveis
+                .isNotEmpty)
               SizedBox(
                 height: 42,
                 child: ListView(
-                  scrollDirection: Axis.horizontal,
+                  scrollDirection:
+                      Axis.horizontal,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(right: 8),
+                      padding:
+                          const EdgeInsets.only(
+                        right: 8,
+                      ),
                       child: ChoiceChip(
-                        label: const Text('Todas'),
+                        label:
+                            const Text('Todas'),
                         selected:
-                            categoriaSelecionada == null,
+                            categoriaSelecionada ==
+                                null,
                         onSelected: (_) {
                           setState(() {
-                            categoriaSelecionada = null;
+                            categoriaSelecionada =
+                                null;
                           });
                         },
                       ),
                     ),
                     ...categoriasDisponiveis.map(
-                      (categoria) => Padding(
+                      (categoria) =>
+                          Padding(
                         padding:
-                            const EdgeInsets.only(right: 8),
+                            const EdgeInsets
+                                .only(
+                          right: 8,
+                        ),
                         child: ChoiceChip(
-                          label: Text(categoria.value),
+                          label: Text(
+                            categoria.value,
+                          ),
                           selected:
                               categoriaSelecionada ==
                                   categoria.key,
@@ -409,12 +602,12 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             if (carregando)
               const Expanded(
                 child: Center(
-                  child: CircularProgressIndicator(),
+                  child:
+                      CircularProgressIndicator(),
                 ),
               )
             else if (erro != null)
@@ -429,24 +622,22 @@ class _HomePageState extends State<HomePage> {
                         size: 48,
                         color: Colors.red,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(
+                        height: 12,
+                      ),
                       const Text(
                         'Não foi possível carregar os produtos.',
-                        textAlign: TextAlign.center,
+                        textAlign:
+                            TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        erro!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                      const SizedBox(
+                        height: 16,
                       ),
-                      const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: carregarProdutos,
-                        child: const Text(
+                        onPressed:
+                            carregarProdutos,
+                        child:
+                            const Text(
                           'Tentar novamente',
                         ),
                       ),
@@ -454,23 +645,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
-            else if (produtos.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Text(
-                    'Nenhum produto disponível no momento.',
-                    style: TextStyle(
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              )
             else if (produtosExibidos.isEmpty)
               const Expanded(
                 child: Center(
                   child: Text(
-                    'Nenhum produto encontrado para este filtro.',
-                    textAlign: TextAlign.center,
+                    'Nenhum produto encontrado.',
                     style: TextStyle(
                       fontSize: 18,
                     ),
@@ -479,156 +658,43 @@ class _HomePageState extends State<HomePage> {
               )
             else
               Expanded(
-                child: GridView.builder(
-                  gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 360,
-                    childAspectRatio: 0.82,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: produtosExibidos.length,
-                  itemBuilder: (context, index) {
-                    final produto =
-                        produtosExibidos[index];
+                child: LayoutBuilder(
+                  builder:
+                      (context, constraints) {
+                    int colunas = 2;
 
-                    final nome =
-                        produto['name']?.toString() ??
-                            'Produto sem nome';
+                    if (constraints.maxWidth >=
+                        1200) {
+                      colunas = 4;
+                    } else if (constraints
+                            .maxWidth >=
+                        800) {
+                      colunas = 3;
+                    }
 
-                    final loja =
-                        produto['store_name']?.toString() ??
-                            produto['seller_name']?.toString() ??
-                            'Loja não informada';
-
-                    final preco =
-                        formatarPreco(produto['price']);
-
-                    final desconto =
-                        produto['discount_percentage'];
-
-                    final rede =
-                        produto['affiliate_network']
-                                ?.toString() ??
-                            'Afiliado';
-
-                    final imagem =
-                        produto['image_url']?.toString();
-
-                    return Card(
-                      elevation: 2,
-                      clipBehavior: Clip.antiAlias,
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              height: 110,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color:
-                                    Colors.grey.shade100,
-                                borderRadius:
-                                    BorderRadius.circular(12),
-                              ),
-                              child:
-                                  imagem != null &&
-                                          imagem
-                                              .trim()
-                                              .isNotEmpty
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius
-                                                  .circular(12),
-                                          child:
-                                              Image.network(
-                                            imagem,
-                                            width:
-                                                double.infinity,
-                                            height: 110,
-                                            fit: BoxFit.contain,
-                                            errorBuilder:
-                                                (
-                                              context,
-                                              error,
-                                              stackTrace,
-                                            ) {
-                                              return const Icon(
-                                                Icons
-                                                    .broken_image_outlined,
-                                                size: 52,
-                                                color:
-                                                    Colors.blueGrey,
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons
-                                              .shopping_bag_outlined,
-                                          size: 52,
-                                          color:
-                                              Colors.blueGrey,
-                                        ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              nome,
-                              maxLines: 3,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              loja,
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color:
-                                    Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              preco,
-                              style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight:
-                                    FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                            if (desconto != null)
-                              Text(
-                                'Desconto: $desconto%',
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                ),
-                              ),
-                            const Spacer(),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  abrirOferta(produto);
-                                },
-                                child: Text(
-                                  'Ver oferta • $rede',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    return GridView.builder(
+                      padding:
+                          const EdgeInsets.only(
+                        bottom: 24,
                       ),
+                      gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount:
+                            colunas,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio:
+                            0.68,
+                      ),
+                      itemCount:
+                          produtosExibidos.length,
+                      itemBuilder:
+                          (context, index) {
+                        return construirCard(
+                          produtosExibidos[
+                              index],
+                        );
+                      },
                     );
                   },
                 ),
