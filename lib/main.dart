@@ -143,8 +143,9 @@ class _HomePageState extends State<HomePage> {
             'id,name,condition,category_id,seller_name,price,store_name,'
             'is_sponsored,created_at,affiliate_url,external_product_id,'
             'original_price,affiliate_network,discount_percentage,'
-            'image_url',
+            'image_url,stock',
           )
+          .gt('stock', 0)
           .order('created_at', ascending: false);
 
       if (!mounted) return;
@@ -189,8 +190,6 @@ class _HomePageState extends State<HomePage> {
     Map<String, dynamic> produto,
   ) async {
     final productId = produto['id'];
-    final affiliateUrl =
-        produto['affiliate_url']?.toString();
 
     if (productId == null) {
       _mostrarMensagem('ID do produto não encontrado.');
@@ -248,29 +247,23 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      if (destino == null &&
-          affiliateUrl != null &&
-          affiliateUrl.trim().isNotEmpty) {
-        destino = affiliateUrl;
+      if (destino == null) {
+        throw Exception(
+          'A função de afiliados não retornou o destino da oferta.',
+        );
       }
 
-      if (destino != null && destino.trim().isNotEmpty) {
+      if (destino.trim().isNotEmpty) {
         await _abrirLink(destino);
         return;
       }
 
       throw Exception(
-        'Não foi possível obter o link da oferta.',
+        'O link da oferta está vazio.',
       );
     } catch (e) {
-      if (affiliateUrl != null &&
-          affiliateUrl.trim().isNotEmpty) {
-        await _abrirLink(affiliateUrl);
-        return;
-      }
-
       _mostrarMensagem(
-        'Erro ao abrir a oferta: $e',
+        'Não foi possível abrir a oferta. Tente novamente.',
       );
     }
   }
@@ -465,7 +458,7 @@ class _HomePageState extends State<HomePage> {
               const Expanded(
                 child: Center(
                   child: Text(
-                    'Nenhum produto encontrado.',
+                    'Nenhum produto disponível no momento.',
                     style: TextStyle(
                       fontSize: 18,
                     ),
@@ -517,7 +510,7 @@ class _HomePageState extends State<HomePage> {
                     final rede =
                         produto['affiliate_network']
                                 ?.toString() ??
-                            'Shopee';
+                            'Afiliado';
 
                     final imagem =
                         produto['image_url']?.toString();
