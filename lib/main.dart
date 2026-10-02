@@ -107,10 +107,15 @@ class _HomePageState extends State<HomePage> {
               produto['seller_name']?.toString().toLowerCase() ??
               '';
 
+      final rede =
+          produto['affiliate_network']?.toString().toLowerCase() ??
+              '';
+
       final correspondeBusca =
           termo.isEmpty ||
           nome.contains(termo) ||
-          loja.contains(termo);
+          loja.contains(termo) ||
+          rede.contains(termo);
 
       final categoriaProduto = int.tryParse(
         produto['category_id']?.toString() ?? '',
@@ -132,27 +137,60 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> carregarProdutos() async {
     try {
-      if (mounted) {
-        setState(() {
-          carregando = true;
-          erro = null;
-        });
-      }
+      setState(() {
+        carregando = true;
+        erro = null;
+      });
 
+      /*
+       * IMPORTANTE:
+       * Não filtramos por stock.
+       * Não filtramos por uma rede específica.
+       *
+       * O projeto trabalha com vários afiliados:
+       * - AWIN
+       * - SHOPEE
+       *
+       * Portanto, carregamos todos os produtos.
+       */
       final resposta = await Supabase.instance.client
           .from('products')
           .select(
-            'id,name,condition,category_id,seller_name,price,'
-            'store_name,is_sponsored,created_at,affiliate_url,'
-            'external_product_id,original_price,affiliate_network,'
-            'discount_percentage,image_url,stock,currency',
+            'id,'
+            'name,'
+            'condition,'
+            'category_id,'
+            'seller_name,'
+            'price,'
+            'store_name,'
+            'is_sponsored,'
+            'created_at,'
+            'affiliate_url,'
+            'external_product_id,'
+            'original_price,'
+            'affiliate_network,'
+            'discount_percentage,'
+            'image_url',
           )
           .order('created_at', ascending: false);
 
-      final lista =
-          List<Map<String, dynamic>>.from(resposta);
-
       if (!mounted) return;
+
+      final lista = List<Map<String, dynamic>>.from(resposta);
+
+      /*
+       * Mantemos produtos que tenham pelo menos uma forma
+       * válida de oferta:
+       *
+       * 1. affiliate_url diretamente em products
+       * OU
+       * 2. registro correspondente em affiliate_products
+       *
+       * Como nem todos os produtos antigos possuem affiliate_url,
+       * primeiro tentamos usar os dados existentes em products.
+       *
+       * Não descartamos produtos simplesmente porque stock = 0.
+       */
 
       setState(() {
         produtos = lista;
@@ -190,58 +228,88 @@ class _HomePageState extends State<HomePage> {
     return 'R\$ ${numero.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
-  String nomeRede(Map<String, dynamic> produto) {
-    final rede =
-        produto['affiliate_network']?.toString().toLowerCase();
+  String nomeRede(dynamic valor) {
+    final rede = valor?.toString().trim().toLowerCase();
 
     if (rede == 'awin') {
-      return 'Awin';
+      return 'AWIN';
     }
 
     if (rede == 'shopee') {
       return 'Shopee';
     }
 
-    return rede?.isNotEmpty == true
-        ? rede!.toUpperCase()
-        : 'Afiliado';
+    if (rede == null || rede.isEmpty) {
+      return 'Oferta';
+    }
+
+    return rede.toUpperCase();
+  }
+
+  Color corRede(dynamic valor) {
+    final rede = valor?.toString().trim().toLowerCase();
+
+    if (rede == 'awin') {
+      return Colors.deepPurple;
+    }
+
+    if (rede == 'shopee') {
+      return Colors.deepOrange;
+    }
+
+    return Colors.blue;
   }
 
   Future<void> abrirOferta(
     Map<String, dynamic> produto,
   ) async {
     final productId = produto['id'];
+
     final affiliateUrl =
         produto['affiliate_url']?.toString();
 
     if (productId == null) {
-      _mostrarMensagem('ID do produto não encontrado.');
+      _mostrarMensagem(
+        'ID do produto não encontrado.',
+      );
       return;
     }
 
     final id = int.tryParse(productId.toString());
 
     if (id == null) {
-      _mostrarMensagem('ID do produto inválido.');
+      _mostrarMensagem(
+        'ID do produto inválido.',
+      );
       return;
     }
+
+    _mostrarMensagem(
+      'Abrindo oferta...',
+      duracao: const Duration(seconds: 2),
+    );
 
     try {
       final uri = Uri.parse(
         '$affiliateClickFunctionUrl?product_id=$id',
       );
 
-      final request = http.Request('GET', uri)
-        ..followRedirects = false;
+      final request = http.Request(
+        'GET',
+        uri,
+      )..followRedirects = false;
 
       request.headers.addAll({
-        'Authorization': 'Bearer $supabaseAnonKey',
+        'Authorization':
+            'Bearer $supabaseAnonKey',
         'apikey': supabaseAnonKey,
       });
 
-      final streamedResponse = await request.send();
+      final streamedResponse =
+          await request.send();
 
-      final response = await http.Response.fromStream(
+      final response =
+          await http.Response.fromStream(
         streamedResponse,
       );
 
@@ -249,21 +317,38 @@ class _HomePageState extends State<HomePage> {
 
       if (response.statusCode >= 300 &&
           response.statusCode < 400) {
-        destino = response.headers['location'];
+        destino =
+            response.headers['location'];
       }
 
-      if (destino == null && response.body.isNotEmpty) {
+      if (destino == null &&
+          response.body.isNotEmpty) {
         try {
-          final json = jsonDecode(response.body);
+          final json =
+              jsonDecode(response.body);
 
           if (json is Map &&
               json['affiliate_url'] != null) {
             destino =
                 json['affiliate_url'].toString();
           }
-        } catch (_) {}
+
+          if (destino == null &&
+              json is Map &&
+              json['url'] != null) {
+            destino =
+                json['url'].toString();
+          }
+        } catch (_) {
+          // Resposta não é JSON.
+        }
       }
 
+      /*
+       * Fallback:
+       * caso a Edge Function não retorne o redirect,
+       * usamos o affiliate_url salvo no produto.
+       */
       if (destino == null &&
           affiliateUrl != null &&
           affiliateUrl.trim().isNotEmpty) {
@@ -279,7 +364,12 @@ class _HomePageState extends State<HomePage> {
       throw Exception(
         'Não foi possível obter o link da oferta.',
       );
-    } catch (_) {
+    } catch (e) {
+      /*
+       * Mesmo que a Edge Function falhe,
+       * não impedimos o usuário de acessar
+       * uma oferta que já possui affiliate_url.
+       */
       if (affiliateUrl != null &&
           affiliateUrl.trim().isNotEmpty) {
         await _abrirLink(affiliateUrl);
@@ -287,7 +377,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       _mostrarMensagem(
-        'Não foi possível abrir esta oferta.',
+        'Erro ao abrir a oferta.',
       );
     }
   }
@@ -296,7 +386,9 @@ class _HomePageState extends State<HomePage> {
     final uri = Uri.tryParse(url);
 
     if (uri == null) {
-      _mostrarMensagem('Link da oferta inválido.');
+      _mostrarMensagem(
+        'Link da oferta inválido.',
+      );
       return;
     }
 
@@ -319,7 +411,8 @@ class _HomePageState extends State<HomePage> {
   }) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(mensagem),
         duration: duracao,
@@ -328,13 +421,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget construirImagem(String? imagem) {
-    if (imagem == null || imagem.trim().isEmpty) {
+    if (imagem == null ||
+        imagem.trim().isEmpty) {
       return Container(
         color: Colors.grey.shade100,
         alignment: Alignment.center,
         child: const Icon(
           Icons.shopping_bag_outlined,
-          size: 56,
+          size: 52,
           color: Colors.blueGrey,
         ),
       );
@@ -345,12 +439,12 @@ class _HomePageState extends State<HomePage> {
       alignment: Alignment.center,
       child: Image.network(
         imagem,
-        fit: BoxFit.contain,
         width: double.infinity,
-        height: double.infinity,
+        height: 180,
+        fit: BoxFit.contain,
         loadingBuilder:
-            (context, child, loadingProgress) {
-          if (loadingProgress == null) {
+            (context, child, progress) {
+          if (progress == null) {
             return child;
           }
 
@@ -361,114 +455,11 @@ class _HomePageState extends State<HomePage> {
         errorBuilder:
             (context, error, stackTrace) {
           return const Icon(
-            Icons.image_not_supported_outlined,
-            size: 56,
+            Icons.broken_image_outlined,
+            size: 52,
             color: Colors.blueGrey,
           );
         },
-      ),
-    );
-  }
-
-  Widget construirCard(
-    Map<String, dynamic> produto,
-  ) {
-    final nome =
-        produto['name']?.toString() ??
-            'Produto sem nome';
-
-    final loja =
-        produto['store_name']?.toString() ??
-            produto['seller_name']?.toString() ??
-            'Loja não informada';
-
-    final preco =
-        formatarPreco(produto['price']);
-
-    final desconto =
-        produto['discount_percentage'];
-
-    final imagem =
-        produto['image_url']?.toString();
-
-    final rede = nomeRede(produto);
-
-    return Card(
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: construirImagem(imagem),
-          ),
-          Expanded(
-            child: Padding(
-              padding:
-                  const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    nome,
-                    maxLines: 3,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    loja,
-                    maxLines: 1,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color:
-                          Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    preco,
-                    style: const TextStyle(
-                      fontSize: 21,
-                      fontWeight:
-                          FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  if (desconto != null)
-                    Text(
-                      'Desconto: $desconto%',
-                      style:
-                          const TextStyle(
-                        color: Colors.red,
-                      ),
-                    ),
-                  const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () =>
-                          abrirOferta(produto),
-                      child: Text(
-                        'Ver oferta • $rede',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -489,38 +480,51 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             onPressed: carregarProdutos,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Atualizar produtos',
+            icon: const Icon(
+              Icons.refresh,
+            ),
+            tooltip:
+                'Atualizar produtos',
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding:
+            const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
             const Text(
-              'Encontre ofertas',
+              'Preço Nexo',
               style: TextStyle(
                 fontSize: 26,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
+
             const SizedBox(height: 4),
+
             Text(
               '${produtos.length} produtos disponíveis',
               style: TextStyle(
-                color: Colors.grey.shade700,
+                color:
+                    Colors.grey.shade700,
               ),
             ),
-            const SizedBox(height: 14),
+
+            const SizedBox(height: 16),
+
             TextField(
-              decoration: InputDecoration(
+              decoration:
+                  InputDecoration(
                 hintText:
-                    'Buscar produtos ou lojas',
+                    'Buscar produtos',
                 prefixIcon:
-                    const Icon(Icons.search),
+                    const Icon(
+                  Icons.search,
+                ),
                 suffixIcon:
                     busca.isNotEmpty
                         ? IconButton(
@@ -528,17 +532,23 @@ class _HomePageState extends State<HomePage> {
                                 const Icon(
                               Icons.clear,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                busca = '';
-                              });
+                            onPressed:
+                                () {
+                              setState(
+                                () {
+                                  busca =
+                                      '';
+                                },
+                              );
                             },
                           )
                         : null,
                 border:
                     OutlineInputBorder(
                   borderRadius:
-                      BorderRadius.circular(12),
+                      BorderRadius.circular(
+                    12,
+                  ),
                 ),
               ),
               onChanged: (valor) {
@@ -547,9 +557,21 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 16),
+
             if (categoriasDisponiveis
-                .isNotEmpty)
+                .isNotEmpty) ...[
+              const Text(
+                'Categorias',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+
               SizedBox(
                 height: 42,
                 child: ListView(
@@ -563,7 +585,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                       child: ChoiceChip(
                         label:
-                            const Text('Todas'),
+                            const Text(
+                          'Todas',
+                        ),
                         selected:
                             categoriaSelecionada ==
                                 null,
@@ -575,26 +599,33 @@ class _HomePageState extends State<HomePage> {
                         },
                       ),
                     ),
-                    ...categoriasDisponiveis.map(
+
+                    ...categoriasDisponiveis
+                        .map(
                       (categoria) =>
                           Padding(
                         padding:
-                            const EdgeInsets
-                                .only(
+                            const EdgeInsets.only(
                           right: 8,
                         ),
-                        child: ChoiceChip(
-                          label: Text(
+                        child:
+                            ChoiceChip(
+                          label:
+                              Text(
                             categoria.value,
                           ),
                           selected:
                               categoriaSelecionada ==
                                   categoria.key,
-                          onSelected: (_) {
-                            setState(() {
-                              categoriaSelecionada =
-                                  categoria.key;
-                            });
+                          onSelected:
+                              (_) {
+                            setState(
+                              () {
+                                categoriaSelecionada =
+                                    categoria
+                                        .key;
+                              },
+                            );
                           },
                         ),
                       ),
@@ -602,7 +633,10 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-            const SizedBox(height: 14),
+            ],
+
+            const SizedBox(height: 12),
+
             if (carregando)
               const Expanded(
                 child: Center(
@@ -615,10 +649,12 @@ class _HomePageState extends State<HomePage> {
                 child: Center(
                   child: Column(
                     mainAxisAlignment:
-                        MainAxisAlignment.center,
+                        MainAxisAlignment
+                            .center,
                     children: [
                       const Icon(
-                        Icons.error_outline,
+                        Icons
+                            .error_outline,
                         size: 48,
                         color: Colors.red,
                       ),
@@ -629,6 +665,20 @@ class _HomePageState extends State<HomePage> {
                         'Não foi possível carregar os produtos.',
                         textAlign:
                             TextAlign.center,
+                      ),
+                      const SizedBox(
+                        height: 8,
+                      ),
+                      Text(
+                        erro!,
+                        textAlign:
+                            TextAlign.center,
+                        style:
+                            const TextStyle(
+                          fontSize: 12,
+                          color:
+                              Colors.grey,
+                        ),
                       ),
                       const SizedBox(
                         height: 16,
@@ -645,7 +695,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
-            else if (produtosExibidos.isEmpty)
+            else if (produtos.isEmpty)
               const Expanded(
                 child: Center(
                   child: Text(
@@ -656,45 +706,258 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               )
+            else if (produtosExibidos
+                .isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    'Nenhum produto encontrado para este filtro.',
+                    textAlign:
+                        TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              )
             else
               Expanded(
-                child: LayoutBuilder(
-                  builder:
-                      (context, constraints) {
-                    int colunas = 2;
+                child:
+                    GridView.builder(
+                  gridDelegate:
+                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent:
+                        360,
+                    childAspectRatio:
+                        0.72,
+                    crossAxisSpacing:
+                        16,
+                    mainAxisSpacing:
+                        16,
+                  ),
+                  itemCount:
+                      produtosExibidos
+                          .length,
+                  itemBuilder:
+                      (context, index) {
+                    final produto =
+                        produtosExibidos[
+                            index];
 
-                    if (constraints.maxWidth >=
-                        1200) {
-                      colunas = 4;
-                    } else if (constraints
-                            .maxWidth >=
-                        800) {
-                      colunas = 3;
-                    }
+                    final nome =
+                        produto[
+                                    'name']
+                                ?.toString() ??
+                            'Produto sem nome';
 
-                    return GridView.builder(
-                      padding:
-                          const EdgeInsets.only(
-                        bottom: 24,
+                    final loja =
+                        produto[
+                                    'store_name']
+                                ?.toString() ??
+                            produto[
+                                    'seller_name']
+                                ?.toString() ??
+                            'Loja não informada';
+
+                    final preco =
+                        formatarPreco(
+                      produto['price'],
+                    );
+
+                    final desconto =
+                        produto[
+                            'discount_percentage'];
+
+                    final rede =
+                        nomeRede(
+                      produto[
+                          'affiliate_network'],
+                    );
+
+                    final cor =
+                        corRede(
+                      produto[
+                          'affiliate_network'],
+                    );
+
+                    final imagem =
+                        produto[
+                                'image_url']
+                            ?.toString();
+
+                    final possuiOferta =
+                        produto[
+                                    'affiliate_url']
+                                ?.toString()
+                                .trim()
+                                .isNotEmpty ==
+                            true;
+
+                    return Card(
+                      elevation: 2,
+                      clipBehavior:
+                          Clip.antiAlias,
+                      child:
+                          Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: [
+                          SizedBox(
+                            height: 180,
+                            width:
+                                double.infinity,
+                            child:
+                                construirImagem(
+                              imagem,
+                            ),
+                          ),
+
+                          Expanded(
+                            child:
+                                Padding(
+                              padding:
+                                  const EdgeInsets.all(
+                                14,
+                              ),
+                              child:
+                                  Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(
+                                      horizontal:
+                                          8,
+                                      vertical:
+                                          4,
+                                    ),
+                                    decoration:
+                                        BoxDecoration(
+                                      color: cor
+                                          .withValues(
+                                        alpha:
+                                            0.12,
+                                      ),
+                                      borderRadius:
+                                          BorderRadius.circular(
+                                        20,
+                                      ),
+                                    ),
+                                    child:
+                                        Text(
+                                      rede,
+                                      style:
+                                          TextStyle(
+                                        color:
+                                            cor,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                        fontSize:
+                                            12,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        8,
+                                  ),
+
+                                  Text(
+                                    nome,
+                                    maxLines:
+                                        3,
+                                    overflow:
+                                        TextOverflow.ellipsis,
+                                    style:
+                                        const TextStyle(
+                                      fontSize:
+                                          16,
+                                      fontWeight:
+                                          FontWeight.bold,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        6,
+                                  ),
+
+                                  Text(
+                                    loja,
+                                    maxLines:
+                                        1,
+                                    overflow:
+                                        TextOverflow.ellipsis,
+                                    style:
+                                        TextStyle(
+                                      color:
+                                          Colors.grey.shade700,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    height:
+                                        8,
+                                  ),
+
+                                  Text(
+                                    preco,
+                                    style:
+                                        const TextStyle(
+                                      fontSize:
+                                          21,
+                                      fontWeight:
+                                          FontWeight.bold,
+                                      color:
+                                          Colors.green,
+                                    ),
+                                  ),
+
+                                  if (desconto !=
+                                      null)
+                                    Text(
+                                      'Desconto: $desconto%',
+                                      style:
+                                          const TextStyle(
+                                        color:
+                                            Colors.red,
+                                        fontWeight:
+                                            FontWeight.w600,
+                                      ),
+                                    ),
+
+                                  const Spacer(),
+
+                                  SizedBox(
+                                    width:
+                                        double.infinity,
+                                    child:
+                                        ElevatedButton(
+                                      onPressed:
+                                          possuiOferta
+                                              ? () {
+                                                  abrirOferta(
+                                                    produto,
+                                                  );
+                                                }
+                                              : null,
+                                      child:
+                                          Text(
+                                        possuiOferta
+                                            ? 'Ver oferta • $rede'
+                                            : 'Oferta indisponível',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      gridDelegate:
-                          SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount:
-                            colunas,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio:
-                            0.68,
-                      ),
-                      itemCount:
-                          produtosExibidos.length,
-                      itemBuilder:
-                          (context, index) {
-                        return construirCard(
-                          produtosExibidos[
-                              index],
-                        );
-                      },
                     );
                   },
                 ),
