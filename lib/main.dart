@@ -168,10 +168,12 @@ class _HomePageState extends State<HomePage> {
         final fim = inicio + tamanhoPagina - 1;
 
         final resposta = await client
-            .from('products')
-            .select(campos)
-            .order('created_at', ascending: false)
-            .range(inicio, fim);
+    .from('products')
+    .select(campos)
+    .eq('is_active', true)
+    .order('created_at', ascending: false)
+    .range(inicio, fim);
+
 
         final pagina =
             List<Map<String, dynamic>>.from(resposta);
