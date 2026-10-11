@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -59,6 +60,18 @@ class _HomePageState extends State<HomePage> {
   String busca = '';
   int? categoriaSelecionada;
 
+  // Paginação: busca 50 produtos por vez e carrega mais ao rolar.
+  static const int tamanhoPagina = 50;
+  int _proximoInicio = 0;
+  bool _temMais = true;
+  bool _carregandoMais = false;
+  int _geracao = 0;
+
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _buscaController =
+      TextEditingController();
+  Timer? _debounce;
+
   final Map<int, String> categorias = {
     1: 'Eletrônicos',
     2: 'Informática',
@@ -83,60 +96,89 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    carregarProdutos();
+    _scrollController.addListener(_aoRolar);
+    carregarProdutos(reiniciar: true);
   }
 
-  List<MapEntry<int, String>> get categoriasDisponiveis {
-    final ids = produtos
-        .map(
-          (produto) => int.tryParse(
-            produto['category_id']?.toString() ?? '',
-          ),
-        )
-        .whereType<int>()
-        .toSet();
-
-    return categorias.entries
-        .where((categoria) => ids.contains(categoria.key))
-        .toList();
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _scrollController.removeListener(_aoRolar);
+    _scrollController.dispose();
+    _buscaController.dispose();
+    super.dispose();
   }
 
-  List<Map<String, dynamic>> get produtosFiltrados {
-    final termo = busca.trim().toLowerCase();
+  void _aoRolar() {
+    if (!_scrollController.hasClients) return;
 
-    return produtos.where((produto) {
-      final nome =
-          produto['name']?.toString().toLowerCase() ?? '';
+    final posicao = _scrollController.position;
 
-      final loja =
-          produto['store_name']?.toString().toLowerCase() ??
-              produto['seller_name']?.toString().toLowerCase() ??
-              '';
-
-      final correspondeBusca =
-          termo.isEmpty ||
-          nome.contains(termo) ||
-          loja.contains(termo);
-
-      final categoriaProduto = int.tryParse(
-        produto['category_id']?.toString() ?? '',
-      );
-
-      final correspondeCategoria =
-          categoriaSelecionada == null ||
-          categoriaProduto == categoriaSelecionada;
-
-      return correspondeBusca && correspondeCategoria;
-    }).toList();
-  }
-
-  Future<void> carregarProdutos() async {
-    if (mounted) {
-      setState(() {
-        carregando = true;
-        erro = null;
-      });
+    if (posicao.pixels >= posicao.maxScrollExtent - 800) {
+      carregarProdutos();
     }
+  }
+
+  void _aoMudarBusca(String valor) {
+    setState(() {
+      busca = valor;
+    });
+
+    _debounce?.cancel();
+    _debounce = Timer(
+      const Duration(milliseconds: 500),
+      () => carregarProdutos(reiniciar: true),
+    );
+  }
+
+  void _limparBusca() {
+    _debounce?.cancel();
+    _buscaController.clear();
+
+    setState(() {
+      busca = '';
+    });
+
+    carregarProdutos(reiniciar: true);
+  }
+
+  void _selecionarCategoria(int? categoria) {
+    setState(() {
+      categoriaSelecionada = categoria;
+    });
+
+    carregarProdutos(reiniciar: true);
+  }
+
+  Future<void> carregarProdutos({
+    bool reiniciar = false,
+  }) async {
+    if (reiniciar) {
+      _geracao++;
+      _proximoInicio = 0;
+      _temMais = true;
+
+      if (mounted) {
+        setState(() {
+          produtos = [];
+          carregando = true;
+          erro = null;
+        });
+      }
+    } else {
+      if (carregando || _carregandoMais || !_temMais) {
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _carregandoMais = true;
+        });
+      }
+    }
+
+    final geracao = _geracao;
+    final inicio = _proximoInicio;
 
     try {
       final client = Supabase.instance.client;
@@ -159,47 +201,74 @@ class _HomePageState extends State<HomePage> {
           'image_url,'
           'stock';
 
-      final List<Map<String, dynamic>> todosProdutos = [];
+      final termo = busca
+          .trim()
+          .replaceAll(RegExp(r'[,()%*\\]'), ' ')
+          .trim();
 
-      const tamanhoPagina = 50;
-      int inicio = 0;
+      var consulta = client
+          .from('products')
+          .select(campos)
+          .eq('is_active', true);
 
-      while (true) {
-        final fim = inicio + tamanhoPagina - 1;
-
-        final resposta = await client
-    .from('products')
-    .select(campos)
-    .eq('is_active', true)
-    .order('created_at', ascending: false)
-    .range(inicio, fim);
-
-
-        final pagina =
-            List<Map<String, dynamic>>.from(resposta);
-
-        todosProdutos.addAll(pagina);
-
-        if (pagina.length < tamanhoPagina) {
-          break;
-        }
-
-        inicio += tamanhoPagina;
+      if (categoriaSelecionada != null) {
+        consulta = consulta.eq(
+          'category_id',
+          categoriaSelecionada!,
+        );
       }
 
-      if (!mounted) return;
+      if (termo.isNotEmpty) {
+        consulta = consulta.or(
+          'name.ilike.%$termo%,'
+          'store_name.ilike.%$termo%,'
+          'seller_name.ilike.%$termo%',
+        );
+      }
+
+      final fim = inicio + tamanhoPagina - 1;
+
+      final resposta = await consulta
+          .order('created_at', ascending: false)
+          .order('id', ascending: false)
+          .range(inicio, fim);
+
+      final pagina =
+          List<Map<String, dynamic>>.from(resposta);
+
+      // Ignora respostas de uma busca antiga.
+      if (!mounted || geracao != _geracao) return;
 
       setState(() {
-        produtos = todosProdutos;
+        produtos.addAll(pagina);
+        _proximoInicio = inicio + tamanhoPagina;
+
+        if (pagina.length < tamanhoPagina) {
+          _temMais = false;
+        }
+
         carregando = false;
+        _carregandoMais = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || geracao != _geracao) return;
+
+      final semProdutos = produtos.isEmpty;
 
       setState(() {
         carregando = false;
-        erro = e.toString();
+        _carregandoMais = false;
+
+        if (semProdutos) {
+          erro = e.toString();
+        }
       });
+
+      if (!semProdutos) {
+        _mostrarMensagem(
+          'Erro ao carregar mais produtos.',
+        );
+      }
     }
   }
 
@@ -628,9 +697,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final produtosExibidos =
-        produtosFiltrados;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -641,14 +707,16 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            onPressed: carregarProdutos,
+            onPressed: () =>
+                carregarProdutos(reiniciar: true),
             icon: const Icon(Icons.refresh),
             tooltip: 'Atualizar produtos',
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: carregarProdutos,
+        onRefresh: () =>
+            carregarProdutos(reiniciar: true),
         child: Padding(
           padding:
               const EdgeInsets.all(16),
@@ -666,7 +734,9 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${produtos.length} produtos disponíveis',
+                _temMais
+                    ? '${produtos.length}+ produtos'
+                    : '${produtos.length} produtos',
                 style: TextStyle(
                   color:
                       Colors.grey.shade700,
@@ -674,6 +744,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 14),
               TextField(
+                controller: _buscaController,
                 decoration:
                     InputDecoration(
                   hintText:
@@ -687,11 +758,8 @@ class _HomePageState extends State<HomePage> {
                                   const Icon(
                                 Icons.clear,
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  busca = '';
-                                });
-                              },
+                              onPressed:
+                                  _limparBusca,
                             )
                           : null,
                   border:
@@ -702,78 +770,61 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-                onChanged: (valor) {
-                  setState(() {
-                    busca = valor;
-                  });
-                },
+                onChanged: _aoMudarBusca,
               ),
               const SizedBox(height: 14),
-              if (categoriasDisponiveis
-                  .isNotEmpty)
-                SizedBox(
-                  height: 42,
-                  child: ListView(
-                    scrollDirection:
-                        Axis.horizontal,
-                    children: [
-                      Padding(
+              SizedBox(
+                height: 42,
+                child: ListView(
+                  scrollDirection:
+                      Axis.horizontal,
+                  children: [
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(
+                        right: 8,
+                      ),
+                      child: ChoiceChip(
+                        label:
+                            const Text(
+                          'Todas',
+                        ),
+                        selected:
+                            categoriaSelecionada ==
+                                null,
+                        onSelected: (_) =>
+                            _selecionarCategoria(
+                          null,
+                        ),
+                      ),
+                    ),
+                    ...categorias.entries.map(
+                      (categoria) => Padding(
                         padding:
-                            const EdgeInsets.only(
+                            const EdgeInsets
+                                .only(
                           right: 8,
                         ),
                         child: ChoiceChip(
-                          label:
-                              const Text(
-                            'Todas',
+                          label: Text(
+                            categoria.value,
                           ),
                           selected:
                               categoriaSelecionada ==
-                                  null,
-                          onSelected: (_) {
-                            setState(() {
-                              categoriaSelecionada =
-                                  null;
-                            });
-                          },
-                        ),
-                      ),
-                      ...categoriasDisponiveis
-                          .map(
-                        (categoria) =>
-                            Padding(
-                          padding:
-                              const EdgeInsets
-                                  .only(
-                            right: 8,
-                          ),
-                          child: ChoiceChip(
-                            label: Text(
-                              categoria.value,
-                            ),
-                            selected:
-                                categoriaSelecionada ==
-                                    categoria
-                                        .key,
-                            onSelected: (_) {
-                              setState(() {
-                                categoriaSelecionada =
-                                    categoria
-                                        .key;
-                              });
-                            },
+                                  categoria.key,
+                          onSelected: (_) =>
+                              _selecionarCategoria(
+                            categoria.key,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
               const SizedBox(height: 12),
               Expanded(
-                child:
-                    _conteudoProdutos(
-                  produtosExibidos,
-                ),
+                child: _conteudoProdutos(),
               ),
             ],
           ),
@@ -782,10 +833,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _conteudoProdutos(
-    List<Map<String, dynamic>>
-        produtosExibidos,
-  ) {
+  Widget _conteudoProdutos() {
     if (carregando) {
       return const Center(
         child:
@@ -828,8 +876,10 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed:
-                    carregarProdutos,
+                onPressed: () =>
+                    carregarProdutos(
+                  reiniciar: true,
+                ),
                 child: const Text(
                   'Tentar novamente',
                 ),
@@ -841,28 +891,29 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (produtos.isEmpty) {
-      return const Center(
-        child: Text(
-          'Nenhum produto encontrado.',
-          style:
-              TextStyle(fontSize: 18),
-        ),
-      );
-    }
+      final comFiltro =
+          busca.trim().isNotEmpty ||
+              categoriaSelecionada != null;
 
-    if (produtosExibidos.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Nenhum produto encontrado para este filtro.',
+          comFiltro
+              ? 'Nenhum produto encontrado para este filtro.'
+              : 'Nenhum produto encontrado.',
           textAlign:
               TextAlign.center,
-          style:
-              TextStyle(fontSize: 18),
+          style: const TextStyle(
+            fontSize: 18,
+          ),
         ),
       );
     }
 
+    final mostrarCarregandoMais =
+        _carregandoMais;
+
     return GridView.builder(
+      controller: _scrollController,
       padding:
           const EdgeInsets.only(
         bottom: 20,
@@ -874,13 +925,20 @@ class _HomePageState extends State<HomePage> {
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount:
-          produtosExibidos.length,
+      itemCount: produtos.length +
+          (mostrarCarregandoMais ? 1 : 0),
       itemBuilder:
           (context, index) {
+        if (index >= produtos.length) {
+          return const Center(
+            child:
+                CircularProgressIndicator(),
+          );
+        }
+
         return _produtoCard(
           context,
-          produtosExibidos[index],
+          produtos[index],
         );
       },
     );
