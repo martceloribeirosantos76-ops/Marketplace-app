@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PreçoNexo - Conectar Mercado Livre</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    header {
+      background: #111827;
+      color: white;
+      padding: 22px 15px;
+      text-align: center;
+    }
+
+    header h1 { font-size: 28px; margin-bottom: 7px; }
+    header p { color: #d1d5db; font-size: 15px; }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px 15px;
+    }
+
+    .bloco {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .bloco h2 { font-size: 20px; margin-bottom: 10px; }
+
+    .bloco p {
+      color: #666;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .botao {
+      display: block;
+      width: 100%;
+      background: #3483fa;
+      color: white;
+      text-align: center;
+      padding: 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 17px;
+      border: none;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    .botao:hover { background: #2968c8; }
+
+    .status {
+      display: none;
+      margin-top: 15px;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status.sucesso {
+      display: block;
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .status.erro {
+      display: block;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 25px 15px;
+      color: #777;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>PreçoNexo</h1>
+  <p>Conexão com o Mercado Livre</p>
+</header>
+
+<main class="container">
+  <div class="bloco">
+    <h2>Conectar Mercado Livre</h2>
+    <p>
+      Conecte sua conta do Mercado Livre ao PreçoNexo
+      para permitir o acesso seguro às funcionalidades da API.
+    </p>
+
+    <button id="btnMercadoLivre" class="botao" type="button">
+      Conectar Mercado Livre
+    </button>
+
+    <div id="oauthStatus" class="status"></div>
+  </div>
+</main>
+
+<footer>
+  © 2026 PreçoNexo
+</footer>
+
+<script>
+  const CLIENT_ID = "7012728545845567";
+
+  const REDIRECT_URI =
+    "https://martceloribeirosantos76-ops.github.io/Marketplace-app/mercadolivre.html";
+
+  const AUTHORIZATION_URL =
+    "https://auth.mercadolivre.com.br/authorization";
+
+  const FUNCTION_URL =
+    "https://iwjnkguatgumdcfpytpu.supabase.co/functions/v1/mercadolivre-oauth";
+
+  const btnMercadoLivre = document.getElementById("btnMercadoLivre");
+  const oauthStatus = document.getElementById("oauthStatus");
+
+  function mostrarStatus(mensagem, tipo) {
+    oauthStatus.textContent = mensagem;
+    oauthStatus.className = "status " + tipo;
+  }
+
+  function gerarRandomString(tamanho = 64) {
+    const caracteres =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+    const valores = new Uint8Array(tamanho);
+    crypto.getRandomValues(valores);
+
+    let resultado = "";
+    for (let i = 0; i < valores.length; i++) {
+      resultado += caracteres[valores[i] % caracteres.length];
+    }
+    return resultado;
+  }
+
+  function base64UrlEncode(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    let string = "";
+    for (const byte of bytes) {
+      string += String.fromCharCode(byte);
+    }
+    return btoa(string)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+  async function gerarCodeChallenge(codeVerifier) {
+    const data = new TextEncoder().encode(codeVerifier);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return base64UrlEncode(digest);
+  }
+
+  /* Cookies temporários para o state e o verifier sobreviverem ao redirecionamento. */
+  function definirCookie(nome, valor, segundos = 600) {
+    document.cookie =
+      nome + "=" + encodeURIComponent(valor) +
+      "; Max-Age=" + segundos +
+      "; Path=/; Secure; SameSite=Lax";
+  }
+
+  function obterCookie(nome) {
+    const cookies = document.cookie.split(";");
+    for (const cookie of cookies) {
+      const partes = cookie.trim().split("=");
+      const chave = partes.shift();
+      const valor = partes.join("=");
+      if (chave === nome) {
+        return decodeURIComponent(valor);
+      }
+    }
+    return null;
+  }
+
+  function apagarCookie(nome) {
+    document.cookie =
+      nome + "=; Max-Age=0; Path=/; Secure; SameSite=Lax";
+  }
+
+  async function iniciarOAuth() {
+    try {
+      mostrarStatus(
+        "Preparando conexão segura com o Mercado Livre...",
+        "sucesso"
+      );
+
+      const codeVerifier = gerarRandomString(64);
+      const state = gerarRandomString(64);
+      const codeChallenge = await gerarCodeChallenge(codeVerifier);
+
+      definirCookie("preco_nexo_state", state, 600);
+      definirCookie("preco_nexo_code_verifier", codeVerifier, 600);
+
+      const params = new URLSearchParams();
+      params.set("response_type", "code");
+      params.set("client_id", CLIENT_ID);
+      params.set("redirect_uri", REDIRECT_URI);
+      params.set("code_challenge", codeChallenge);
+      params.set("code_challenge_method", "S256");
+      params.set("state", state);
+
+      window.location.href = AUTHORIZATION_URL + "?" + params.toString();
+    } catch (erro) {
+      console.error("Erro ao iniciar OAuth:", erro);
+      mostrarStatus(
+        "Não foi possível iniciar a conexão com o Mercado Livre.",
+        "erro"
+      );
+    }
+  }
+
+  async function processarRetornoOAuth() {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const code = urlParams.get("code");
+    const stateRecebido = urlParams.get("state");
+    const error = urlParams.get("error");
+    const errorDescription = urlParams.get("error_description");
+
+    /* Visita normal à página. */
+    if (!code && !stateRecebido && !error) {
+      return;
+    }
+
+    if (error) {
+      console.error("Erro Mercado Livre:", error, errorDescription);
+      mostrarStatus(
+        "O Mercado Livre recusou ou interrompeu a autorização: " +
+        (errorDescription || error),
+        "erro"
+      );
+      return;
+    }
+
+    if (!code) {
+      mostrarStatus(
+        "O Mercado Livre retornou uma resposta sem código de autorização.",
+        "erro"
+      );
+      return;
+    }
+
+    const stateEsperado = obterCookie("preco_nexo_state");
+
+    if (!stateEsperado || !stateRecebido || stateRecebido !== stateEsperado) {
+      console.error("Falha na validação do state.");
+      mostrarStatus(
+        "Erro de segurança: não foi possível validar esta autorização. Inicie novamente pelo botão desta página.",
+        "erro"
+      );
+      return;
+    }
+
+    const codeVerifier = obterCookie("preco_nexo_code_verifier");
+
+    if (!codeVerifier) {
+      mostrarStatus(
+        "O código PKCE não foi encontrado. Inicie a autorização novamente.",
+        "erro"
+      );
+      return;
+    }
+
+    try {
+      mostrarStatus("Finalizando conexão com o Mercado Livre...", "sucesso");
+
+      const response = await fetch(FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: code,
+          code_verifier: codeVerifier
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error("Erro na Edge Function:", data);
+        mostrarStatus(
+          "Não foi possível concluir a conexão com o Mercado Livre.",
+          "erro"
+        );
+        return;
+      }
+
+      apagarCookie("preco_nexo_state");
+      apagarCookie("preco_nexo_code_verifier");
+
+      mostrarStatus("Mercado Livre conectado com sucesso!", "sucesso");
+
+      /* Remove code/state da URL. */
+      window.history.replaceState({}, document.title, REDIRECT_URI);
+    } catch (erro) {
+      console.error("Erro ao comunicar com a Edge Function:", erro);
+      mostrarStatus(
+        "Erro ao finalizar a conexão com o Mercado Livre.",
+        "erro"
+      );
+    }
+  }
+
+  btnMercadoLivre.addEventListener("click", iniciarOAuth);
+
+  processarRetornoOAuth();
+</script>
+
+</body>
+</html>
