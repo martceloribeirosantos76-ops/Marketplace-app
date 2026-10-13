@@ -742,6 +742,18 @@ class _HomePageState extends State<HomePage> {
                       Colors.grey.shade700,
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Publicidade: alguns links são de afiliados e '
+                'podemos receber comissão se você comprar. '
+                'Preços e disponibilidade podem mudar, '
+                'confira na loja.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color:
+                      Colors.grey.shade600,
+                ),
+              ),
               const SizedBox(height: 14),
               TextField(
                 controller: _buscaController,
