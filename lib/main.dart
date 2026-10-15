@@ -293,48 +293,6 @@ class _HomePageState extends State<HomePage> {
     return rede == 'mercadolivre';
   }
 
-  String nomeRede(Map<String, dynamic> produto) {
-    final rede =
-        produto['affiliate_network']?.toString().trim();
-
-    if (rede == null || rede.isEmpty) {
-      return 'Oferta';
-    }
-
-    if (rede.toLowerCase() == 'awin') {
-      return 'Awin';
-    }
-
-    if (rede.toLowerCase() == 'shopee') {
-      return 'Shopee';
-    }
-
-    if (rede.toLowerCase() == 'mercadolivre') {
-      return 'Mercado Livre';
-    }
-
-    return rede;
-  }
-
-  Color corRede(Map<String, dynamic> produto) {
-    final rede =
-        produto['affiliate_network']?.toString().toLowerCase();
-
-    if (rede == 'awin') {
-      return Colors.deepPurple;
-    }
-
-    if (rede == 'shopee') {
-      return Colors.orange.shade800;
-    }
-
-    if (rede == 'mercadolivre') {
-      return Colors.amber.shade800;
-    }
-
-    return Colors.blue;
-  }
-
   Future<void> abrirOferta(
     Map<String, dynamic> produto,
   ) async {
@@ -552,7 +510,6 @@ class _HomePageState extends State<HomePage> {
     final desconto =
         produto['discount_percentage'];
 
-    final rede = nomeRede(produto);
 
     final imagem =
         produto['image_url']?.toString().trim();
@@ -614,30 +571,6 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
-                      const Spacer(),
-                      Container(
-                        padding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: corRede(produto)
-                              .withValues(alpha: 0.10),
-                          borderRadius:
-                              BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          rede,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight.bold,
-                            color:
-                                corRede(produto),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
