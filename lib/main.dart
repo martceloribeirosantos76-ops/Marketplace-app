@@ -286,6 +286,13 @@ class _HomePageState extends State<HomePage> {
     return 'R\$ ${numero.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 
+  bool ehMercadoLivre(Map<String, dynamic> produto) {
+    final rede =
+        produto['affiliate_network']?.toString().toLowerCase();
+
+    return rede == 'mercadolivre';
+  }
+
   String nomeRede(Map<String, dynamic> produto) {
     final rede =
         produto['affiliate_network']?.toString().trim();
@@ -302,6 +309,10 @@ class _HomePageState extends State<HomePage> {
       return 'Shopee';
     }
 
+    if (rede.toLowerCase() == 'mercadolivre') {
+      return 'Mercado Livre';
+    }
+
     return rede;
   }
 
@@ -315,6 +326,10 @@ class _HomePageState extends State<HomePage> {
 
     if (rede == 'shopee') {
       return Colors.orange.shade800;
+    }
+
+    if (rede == 'mercadolivre') {
+      return Colors.amber.shade800;
     }
 
     return Colors.blue;
@@ -532,6 +547,8 @@ class _HomePageState extends State<HomePage> {
 
     final preco = formatarPreco(produto['price']);
 
+    final ml = ehMercadoLivre(produto);
+
     final desconto =
         produto['discount_percentage'];
 
@@ -636,28 +653,42 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    loja,
-                    maxLines: 1,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color:
-                          Colors.grey.shade700,
+                  if (!ml) ...[
+                    Text(
+                      loja,
+                      maxLines: 1,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color:
+                            Colors.grey.shade700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    preco,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight:
-                          FontWeight.bold,
-                      color: Colors.green,
+                    const SizedBox(height: 6),
+                  ],
+                  if (ml)
+                    Text(
+                      'Veja o preço atual no Mercado Livre',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            FontWeight.w600,
+                        color:
+                            Colors.grey.shade800,
+                      ),
+                    )
+                  else
+                    Text(
+                      preco,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight:
+                            FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
-                  ),
-                  if (desconto != null)
+                  if (!ml && desconto != null)
                     Text(
                       'Desconto: $desconto%',
                       style: const TextStyle(
