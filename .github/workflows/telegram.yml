@@ -20,11 +20,49 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Publicar produtos
+      
+name: Publicar Ofertas Telegram
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Testar conexao Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-  run: |
-  python -c "import os, urllib.request; u=os.environ['SUPABASE_URL'].rstrip('/')+'/rest/v1/products?select=id&limit=1'; k=os.environ['SUPABASE_KEY']; r=urllib.request.Request(u,headers={'apikey':k,'Authorization':'Bearer '+k}); print('Resposta Supabase:',urllib.request.urlopen(r,timeout=30).status)"
+        run: |
+          python - <<'PY'
+          import os
+          import urllib.request
+
+          url = os.environ["SUPABASE_URL"].rstrip("/")
+          url += "/rest/v1/products?select=id&limit=1"
+          chave = os.environ["SUPABASE_KEY"]
+
+          req = urllib.request.Request(
+              url,
+              headers={
+                  "apikey": chave,
+                  "Authorization": "Bearer " + chave,
+              },
+          )
+
+          with urllib.request.urlopen(req, timeout=30) as resposta:
+              print("Resposta Supabase:", resposta.status)
+          PY
