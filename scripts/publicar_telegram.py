@@ -4,130 +4,115 @@ import json
 import random
 import urllib.request
 import urllib.parse
-import urllib.error
-from pathlib import Path
+from datetime import datetime, timezone
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-HISTORICO = Path("scripts/telegram_historico.json")
-LIMITE = 5
+
+def supabase(tabela, parametros=None, dados=None):
+    url = SUPABASE_URL + "/rest/v1/" + tabela
+
+    if parametros:
+        url += "?" + urllib.parse.urlencode(parametros)
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+    metodo = "POST" if dados is not None else "GET"
+    corpo = json.dumps(dados).encode() if dados is not None else None
+
+    req = urllib.request.Request(
+        url, data=corpo, headers=headers, method=metodo
+    )
+
+    with urllib.request.urlopen(req, timeout=30) as resposta:
+        conteudo = resposta.read()
+        return json.loads(conteudo) if conteudo else []
 
 
-def requisicao(url, dados=None, headers=None):
-    corpo = None
-    if dados is not None:
-        corpo = json.dumps(dados).encode("utf-8")
+def enviar_telegram(texto):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    corpo = json.dumps({
+        "chat_id": CHAT_ID,
+        "text": texto,
+        "disable_web_page_preview": True,
+    }).encode("utf-8")
 
     req = urllib.request.Request(
         url,
         data=corpo,
-        headers=headers or {},
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
 
     with urllib.request.urlopen(req, timeout=30) as resposta:
-        return json.loads(resposta.read().decode("utf-8"))
+        resultado = json.loads(resposta.read())
+
+    if not resultado.get("ok"):
+        raise RuntimeError("Telegram nao confirmou o envio")
+
+    return resultado["result"]["message_id"]
 
 
-def buscar_produtos():
-    parametros = urllib.parse.urlencode({
-        "select": "id,name,price,image_url,affiliate_url,store_name",
+def main():
+    historico = supabase("telegram_publications", {
+        "select": "product_id",
+        "limit": "100000",
+    })
+
+    publicados = {str(p["product_id"]) for p in historico}
+
+    produtos = supabase("products", {
+        "select": "id,name,price,store_name,affiliate_url",
         "affiliate_url": "not.is.null",
         "limit": "1000",
     })
 
-    url = f"{SUPABASE_URL}/rest/v1/products?{parametros}"
+    disponiveis = [
+        p for p in produtos
+        if str(p["id"]) not in publicados
+        and (p.get("affiliate_url") or "").startswith(
+            ("https://", "http://")
+        )
+    ]
 
-    return requisicao(url, headers={
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-    })
+    if not disponiveis:
+        raise RuntimeError("Nenhum produto novo disponivel")
 
+    produto = random.choice(disponiveis)
 
-def carregar_historico():
-    if HISTORICO.exists():
-        return set(json.loads(HISTORICO.read_text()))
-    return set()
+    mensagem = f"🔥 {produto['name']}\n\n"
 
-
-def salvar_historico(historico):
-    HISTORICO.parent.mkdir(parents=True, exist_ok=True)
-    HISTORICO.write_text(
-        json.dumps(sorted(historico), ensure_ascii=False, indent=2)
-    )
-
-
-def enviar_produto(produto):
-    nome = produto.get("name") or "Oferta especial"
-    preco = produto.get("price")
-    link = produto["affiliate_url"]
-    loja = produto.get("store_name") or "Loja parceira"
-
-    mensagem = f"🔥 {nome}\n\n"
-
-    if preco is not None:
-        valor = f"{float(preco):,.2f}"
-        valor = valor.replace(",", "X").replace(".", ",").replace("X", ".")
-        mensagem += f"💰 R$ {valor}\n"
+    if produto.get("price") is not None:
+        preco = f"{float(produto['price']):,.2f}"
+        preco = preco.replace(",", "X").replace(".", ",")
+        preco = preco.replace("X", ".")
+        mensagem += f"💰 R$ {preco}\n"
 
     mensagem += (
-        f"🏬 {loja}\n\n"
-        f"🛒 Confira a oferta:\n{link}\n\n"
-        "📢 @PrecoNexoOfertas\n"
-        "Publicidade | Podemos receber comissão pela compra."
+        f"🏬 {produto.get('store_name') or 'Loja parceira'}\n\n"
+        f"🛒 Confira a oferta:\n{produto['affiliate_url']}\n\n"
+        "Publicidade: podemos receber comissao pela compra."
     )
 
-    api = f"https://api.telegram.org/bot{BOT_TOKEN}/"
+    mensagem_id = enviar_telegram(mensagem)
 
-    imagem = produto.get("image_url")
-    if imagem and len(mensagem) <= 1024:
-        try:
-            requisicao(api + "sendPhoto", {
-                "chat_id": CHAT_ID,
-                "photo": imagem,
-                "caption": mensagem,
-            })
-            return
-        except (urllib.error.HTTPError, urllib.error.URLError) as erro:
-            print(f"Imagem indisponível: {erro}")
-
-    requisicao(api + "sendMessage", {
-        "chat_id": CHAT_ID,
-        "text": mensagem,
-        "disable_web_page_preview": True,
+    supabase("telegram_publications", dados={
+        "product_id": produto["id"],
+        "telegram_message_id": mensagem_id,
+        "published_at": datetime.now(timezone.utc).isoformat(),
+        "status": "published",
     })
 
-
-def main():
-    produtos = buscar_produtos()
-
-    produtos = [
-        p for p in produtos
-        if p.get("affiliate_url", "").startswith(("https://", "http://"))
-    ]
-
-    historico = carregar_historico()
-    disponiveis = [
-        p for p in produtos if str(p["id"]) not in historico
-    ]
-
-    if not disponiveis and produtos:
-        historico.clear()
-        disponiveis = produtos
-
-    selecionados = random.sample(
-        disponiveis, min(LIMITE, len(disponiveis))
-    )
-
-    for produto in selecionados:
-        enviar_produto(produto)
-        historico.add(str(produto["id"]))
-        salvar_historico(historico)
-        print(f"Publicado produto ID: {produto['id']}")
-
-    print(f"Total publicado: {len(selecionados)}")
+    print(f"Produto publicado e registrado: {produto['id']}")
 
 
 if __name__ == "__main__":
