@@ -20,28 +20,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      
-name: Publicar Ofertas Telegram
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  publicar:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Baixar repositorio
-        uses: actions/checkout@v4
-
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Testar conexao Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -53,6 +31,7 @@ jobs:
 
           url = os.environ["SUPABASE_URL"].rstrip("/")
           url += "/rest/v1/products?select=id&limit=1"
+
           chave = os.environ["SUPABASE_KEY"]
 
           req = urllib.request.Request(
@@ -66,3 +45,4 @@ jobs:
           with urllib.request.urlopen(req, timeout=30) as resposta:
               print("Resposta Supabase:", resposta.status)
           PY
+
