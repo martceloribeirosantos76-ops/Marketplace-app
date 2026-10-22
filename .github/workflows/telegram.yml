@@ -26,4 +26,5 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/publicar_telegram.py
+  run: |
+  python -c "import os, urllib.request; u=os.environ['SUPABASE_URL'].rstrip('/')+'/rest/v1/products?select=id&limit=1'; k=os.environ['SUPABASE_KEY']; r=urllib.request.Request(u,headers={'apikey':k,'Authorization':'Bearer '+k}); print('Resposta Supabase:',urllib.request.urlopen(r,timeout=30).status)"
