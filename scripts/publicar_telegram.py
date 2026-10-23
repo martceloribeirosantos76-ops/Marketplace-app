@@ -151,7 +151,7 @@ def main():
         "Publicidade: podemos receber comissao pela compra."
     )
 
-    mensagem_id = enviar_telegram(mensagem)
+   mensagem_id = enviar_telegram(mensagem, produto.get("image_url"))
 
     supabase("telegram_publications", dados={
         "product_id": produto["id"],
