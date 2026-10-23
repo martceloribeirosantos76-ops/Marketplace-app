@@ -71,7 +71,7 @@ def main():
     publicados = {str(p["product_id"]) for p in historico}
 
     produtos = supabase("products", {
-        "select": "id,name,price,store_name,affiliate_url",
+       "select": "id,name,price,store_name,affiliate_url,image_url",
         "affiliate_url": "not.is.null",
         "limit": "1000",
     })
