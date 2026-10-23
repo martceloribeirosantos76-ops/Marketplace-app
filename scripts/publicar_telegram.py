@@ -37,7 +37,55 @@ def supabase(tabela, parametros=None, dados=None):
         return json.loads(conteudo) if conteudo else []
 
 
-def enviar_telegram(texto):
+
+def enviar_telegram(texto, imagem=None):
+    if imagem and imagem.startswith(("https://", "http://")):
+        try:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+            corpo = json.dumps({
+                "chat_id": CHAT_ID,
+                "photo": imagem,
+                "caption": texto[:1024],
+            }).encode("utf-8")
+
+            req = urllib.request.Request(
+                url,
+                data=corpo,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+
+            with urllib.request.urlopen(req, timeout=30) as resposta:
+                resultado = json.loads(resposta.read())
+
+            if resultado.get("ok"):
+                return resultado["result"]["message_id"]
+
+        except Exception as erro:
+            print(f"Foto indisponivel: {erro}")
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    corpo = json.dumps({
+        "chat_id": CHAT_ID,
+        "text": texto,
+        "disable_web_page_preview": True,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=corpo,
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    with urllib.request.urlopen(req, timeout=30) as resposta:
+        resultado = json.loads(resposta.read())
+
+    if not resultado.get("ok"):
+        raise RuntimeError("Telegram nao confirmou o envio")
+
+    return resultado["result"]["message_id"]
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     corpo = json.dumps({
