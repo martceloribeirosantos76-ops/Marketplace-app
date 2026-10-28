@@ -1,11 +1,11 @@
 {
-    "name": "Preço Nexo - Ofertas de Casa e Utilidades",
+    "name": "Preço Nexo - Ofertas e Achadinhos",
 "short_name": "Preço Nexo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-   "description": "Ofertas de casa e utilidades com links de afiliado.",
+   "description": "Ofertas e achadinhos com links de afiliado.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
