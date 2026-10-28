@@ -1,11 +1,11 @@
 {
-    "name": "preco_nexo",
-    "short_name": "preco_nexo",
+    "name": "Preço Nexo - Ofertas de Casa e Utilidades",
+"short_name": "Preço Nexo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+   "description": "Ofertas de casa e utilidades com links de afiliado.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
