@@ -644,7 +644,8 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.green,
                       ),
                     ),
-                  if (!ml && desconto != null)
+                if (!ml &&
+    (double.tryParse(desconto?.toString() ?? '') ?? 0) > 0)
                     Text(
                       'Desconto: $desconto%',
                       style: const TextStyle(
