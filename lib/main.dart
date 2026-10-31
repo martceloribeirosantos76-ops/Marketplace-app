@@ -655,33 +655,32 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    child:
-                        ElevatedButton.icon(
-                      onPressed: temAfiliado
-                          ? () =>
-                              abrirOferta(produto)
-                          : null,
-                      icon: const Icon(
-                        Icons.open_in_new,
-                        size: 18,
+                                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: temAfiliado
+                              ? () => abrirOferta(produto)
+                              : null,
+                          icon: const Icon(
+                            Icons.open_in_new,
+                            size: 18,
+                          ),
+                          label: Text(
+                            temAfiliado
+                                ? 'Ver oferta'
+                                : 'Sem afiliado',
+                          ),
+                        ),
                       ),
-                      label: Text(
-                        temAfiliado
-                            ? 'Ver oferta'
-                            : 'Sem afiliado',
+                      IconButton(
+                        onPressed: () =>
+                            _compartilharWhatsApp(produto),
+                        icon: const Icon(Icons.share),
+                        tooltip: 'Compartilhar no WhatsApp',
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
