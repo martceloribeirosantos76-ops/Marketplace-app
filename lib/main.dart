@@ -481,7 +481,30 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
+  Widget _botoesSeguir() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () =>
+              _abrirLink('https://t.me/PrecoNexoOfertas'),
+          icon: const Icon(Icons.send, size: 18),
+          label: const Text('Seguir no Telegram'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _abrirLink(
+            'https://instagram.com/preconexo_achadinhos',
+          ),
+          icon: const Icon(
+            Icons.camera_alt_outlined,
+            size: 18,
+          ),
+          label: const Text('Seguir no Instagram'),
+        ),
+      ],
+    );
+  }
   Widget _produtoCard(
     BuildContext context,
     Map<String, dynamic> produto,
@@ -718,6 +741,8 @@ class _HomePageState extends State<HomePage> {
                       Colors.grey.shade600,
                 ),
               ),
+                            const SizedBox(height: 10),
+              _botoesSeguir(),
               const SizedBox(height: 14),
               TextField(
                 controller: _buscaController,
