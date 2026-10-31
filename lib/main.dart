@@ -292,7 +292,22 @@ class _HomePageState extends State<HomePage> {
 
     return rede == 'mercadolivre';
   }
+  Future<void> _compartilharWhatsApp(
+    Map<String, dynamic> produto,
+  ) async {
+    final nome =
+        produto['name']?.toString() ?? 'Oferta';
 
+    const site =
+        'https://martceloribeirosantos76-ops.github.io/Marketplace-app/';
+
+    final texto =
+        'Olha essa oferta que achei no Preço Nexo: $nome\n$site';
+
+    await _abrirLink(
+      'https://wa.me/?text=${Uri.encodeComponent(texto)}',
+    );
+  }
   Future<void> abrirOferta(
     Map<String, dynamic> produto,
   ) async {
