@@ -59,7 +59,7 @@ class _HomePageState extends State<HomePage> {
 
   String busca = '';
   int? categoriaSelecionada;
-
+String ordenacao = 'recentes';
   // Paginação: busca 50 produtos por vez e carrega mais ao rolar.
   static const int tamanhoPagina = 50;
   int _proximoInicio = 0;
@@ -228,10 +228,28 @@ class _HomePageState extends State<HomePage> {
 
       final fim = inicio + tamanhoPagina - 1;
 
-      final resposta = await consulta
-          .order('created_at', ascending: false)
-          .order('id', ascending: false)
-          .range(inicio, fim);
+     final resposta = await (ordenacao == 'maior_desconto'
+    ? consulta
+        .gt('discount_percentage', 0)
+        .order('discount_percentage', ascending: false)
+        .order('id', ascending: false)
+        .range(inicio, fim)
+    : ordenacao == 'menor_preco'
+        ? consulta
+            .gt('price', 0)
+            .order('price', ascending: true)
+            .order('id', ascending: false)
+            .range(inicio, fim)
+        : ordenacao == 'maior_preco'
+            ? consulta
+                .gt('price', 0)
+                .order('price', ascending: false)
+                .order('id', ascending: false)
+                .range(inicio, fim)
+            : consulta
+                .order('created_at', ascending: false)
+                .order('id', ascending: false)
+                .range(inicio, fim));
 
       final pagina =
           List<Map<String, dynamic>>.from(resposta);
