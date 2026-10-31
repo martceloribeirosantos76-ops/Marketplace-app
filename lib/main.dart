@@ -846,9 +846,10 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              Expanded(
+                           Expanded(
                 child: _conteudoProdutos(),
               ),
+              _rodape(),
             ],
           ),
         ),
@@ -856,6 +857,32 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _rodape() {
+    const base =
+        'https://martceloribeirosantos76-ops.github.io/Marketplace-app/';
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      children: [
+        TextButton(
+          onPressed: () => _abrirLink('${base}sobre.html'),
+          child: const Text(
+            'Sobre',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+        TextButton(
+          onPressed: () =>
+              _abrirLink('${base}privacidade.html'),
+          child: const Text(
+            'Política de privacidade',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+   
   Widget _conteudoProdutos() {
     if (carregando) {
       return const Center(
