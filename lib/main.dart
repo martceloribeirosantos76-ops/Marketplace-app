@@ -59,7 +59,8 @@ class _HomePageState extends State<HomePage> {
 
   String busca = '';
   int? categoriaSelecionada;
-String ordenacao = 'recentes';
+  String ordenacao = 'recentes';
+
   // Paginação: busca 50 produtos por vez e carrega mais ao rolar.
   static const int tamanhoPagina = 50;
   int _proximoInicio = 0;
@@ -150,6 +151,16 @@ String ordenacao = 'recentes';
     carregarProdutos(reiniciar: true);
   }
 
+  void _selecionarOrdenacao(String? valor) {
+    if (valor == null || valor == ordenacao) return;
+
+    setState(() {
+      ordenacao = valor;
+    });
+
+    carregarProdutos(reiniciar: true);
+  }
+
   Future<void> carregarProdutos({
     bool reiniciar = false,
   }) async {
@@ -228,28 +239,28 @@ String ordenacao = 'recentes';
 
       final fim = inicio + tamanhoPagina - 1;
 
-     final resposta = await (ordenacao == 'maior_desconto'
-    ? consulta
-        .gt('discount_percentage', 0)
-        .order('discount_percentage', ascending: false)
-        .order('id', ascending: false)
-        .range(inicio, fim)
-    : ordenacao == 'menor_preco'
-        ? consulta
-            .gt('price', 0)
-            .order('price', ascending: true)
-            .order('id', ascending: false)
-            .range(inicio, fim)
-        : ordenacao == 'maior_preco'
-            ? consulta
-                .gt('price', 0)
-                .order('price', ascending: false)
-                .order('id', ascending: false)
-                .range(inicio, fim)
-            : consulta
-                .order('created_at', ascending: false)
-                .order('id', ascending: false)
-                .range(inicio, fim));
+      final resposta = await (ordenacao == 'maior_desconto'
+          ? consulta
+              .gt('discount_percentage', 0)
+              .order('discount_percentage', ascending: false)
+              .order('id', ascending: false)
+              .range(inicio, fim)
+          : ordenacao == 'menor_preco'
+              ? consulta
+                  .gt('price', 0)
+                  .order('price', ascending: true)
+                  .order('id', ascending: false)
+                  .range(inicio, fim)
+              : ordenacao == 'maior_preco'
+                  ? consulta
+                      .gt('price', 0)
+                      .order('price', ascending: false)
+                      .order('id', ascending: false)
+                      .range(inicio, fim)
+                  : consulta
+                      .order('created_at', ascending: false)
+                      .order('id', ascending: false)
+                      .range(inicio, fim));
 
       final pagina =
           List<Map<String, dynamic>>.from(resposta);
@@ -310,6 +321,7 @@ String ordenacao = 'recentes';
 
     return rede == 'mercadolivre';
   }
+
   Future<void> _compartilharWhatsApp(
     Map<String, dynamic> produto,
   ) async {
@@ -326,6 +338,7 @@ String ordenacao = 'recentes';
       'https://wa.me/?text=${Uri.encodeComponent(texto)}',
     );
   }
+
   Future<void> abrirOferta(
     Map<String, dynamic> produto,
   ) async {
@@ -514,6 +527,7 @@ String ordenacao = 'recentes';
       ),
     );
   }
+
   Widget _botoesSeguir() {
     return Wrap(
       spacing: 8,
@@ -538,6 +552,7 @@ String ordenacao = 'recentes';
       ],
     );
   }
+
   Widget _produtoCard(
     BuildContext context,
     Map<String, dynamic> produto,
@@ -565,7 +580,6 @@ String ordenacao = 'recentes';
 
     final desconto =
         produto['discount_percentage'];
-
 
     final imagem =
         produto['image_url']?.toString().trim();
@@ -677,8 +691,12 @@ String ordenacao = 'recentes';
                         color: Colors.green,
                       ),
                     ),
-                if (!ml &&
-    (double.tryParse(desconto?.toString() ?? '') ?? 0) > 0)
+                  if (!ml &&
+                      (double.tryParse(
+                                desconto?.toString() ?? '',
+                              ) ??
+                              0) >
+                          0)
                     Text(
                       'Desconto: $desconto%',
                       style: const TextStyle(
@@ -688,7 +706,7 @@ String ordenacao = 'recentes';
                       ),
                     ),
                   const Spacer(),
-                                  Row(
+                  Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
@@ -722,6 +740,7 @@ String ordenacao = 'recentes';
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -781,7 +800,7 @@ String ordenacao = 'recentes';
                       Colors.grey.shade600,
                 ),
               ),
-                            const SizedBox(height: 10),
+              const SizedBox(height: 10),
               _botoesSeguir(),
               const SizedBox(height: 14),
               TextField(
@@ -863,8 +882,37 @@ String ordenacao = 'recentes';
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-                           Expanded(
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('Ordenar por: '),
+                  DropdownButton<String>(
+                    value: ordenacao,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'recentes',
+                        child: Text('Mais recentes'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'maior_desconto',
+                        child: Text('Maior desconto'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'menor_preco',
+                        child: Text('Menor preço'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'maior_preco',
+                        child: Text('Maior preço'),
+                      ),
+                    ],
+                    onChanged: _selecionarOrdenacao,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
                 child: _conteudoProdutos(),
               ),
               _rodape(),
@@ -900,7 +948,7 @@ String ordenacao = 'recentes';
       ],
     );
   }
-   
+
   Widget _conteudoProdutos() {
     if (carregando) {
       return const Center(
@@ -989,7 +1037,7 @@ String ordenacao = 'recentes';
       gridDelegate:
           const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 360,
-       mainAxisExtent: 520,
+        mainAxisExtent: 520,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
